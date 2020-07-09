@@ -11,6 +11,7 @@ import Test.Spec.Runner (runSpec)
 import Data.Array (concat)
 import Data.Functor (map)
 import Data.Either (Either(..))
+import Data.String (null)
 import Data.Traversable (sequence_)
 import SGF.Parser (parse)
 
@@ -30,8 +31,8 @@ checkParser valid expr = do
 
 goodExprs :: Array String
 goodExprs =
-  [ "(N)"
-  , "(N(N))"
+  [ "(;G[1]B[01])"
+  , "(;G[]B[11](;N[42]))"
   ]
 
 badExprs :: Array String
@@ -50,5 +51,5 @@ main =
   parserTests =
     concat
       [ map (\expr → (it ("parse " <> expr) $ checkParser true expr)) goodExprs
-      , map (\expr → (it ("error " <> expr) $ checkParser false expr)) badExprs
+      , map (\expr → (it ("error " <> if null expr then "(empty)" else expr) $ checkParser false expr)) badExprs
       ]
