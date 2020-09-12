@@ -1,20 +1,21 @@
 module SGF.Parser where
 
-import Prelude (bind, pure, ($))
-import Data.Either (Either)
 import Data.Maybe
 import Control.Alt ((<|>))
 import Control.Lazy (fix)
 import Data.Array as A
+import Data.Char (toCharCode)
+import Data.Either (Either)
 import Data.List (List, some, many)
 import Data.Number (fromString)
 import Data.Semigroup ((<>))
 import Data.Show (class Show, show)
 import Data.String.CodeUnits (fromCharArray)
+import Prelude (bind, pure, ($), (*>), (-))
 import Text.Parsing.Parser (ParseError, Parser, runParser, fail)
 import Text.Parsing.Parser.Combinators (between)
-import Text.Parsing.Parser.Token (digit, letter)
 import Text.Parsing.Parser.String (char, string)
+import Text.Parsing.Parser.Token (digit, letter)
 
 type P a
   = Parser String a
@@ -38,8 +39,12 @@ type Node
 data Property
   = Prop String (List Value)
 
+data Color = Black | White
+
 data Value
-  = PNum Number
+  = Num Number
+  | Point Int Int
+  | Color Color
   | None
 
 instance showSGF :: Show GameTree where
@@ -49,14 +54,28 @@ instance showValue :: Show Value where
   show _ = "A Value"
 
 propertyValue :: P Value
-propertyValue = pNone <|> (between (string "[") (string "]") $ pNum)
+propertyValue = pNone <|> (between (string "[") (string "]") $ (pNum <|> pBlack <|> pWhite <|> pPoint))
   where
   pNum :: P Value
   pNum = do
-    numS <- A.some digit
+    numS <- A.some (digit <|> char '.')
     case fromString (fromCharArray numS) of
-      Just a -> pure $ PNum a
-      Nothing -> fail ("Invalid pNum: " <> fromCharArray numS)
+      Just a -> pure $ Num a
+      Nothing -> fail ("Invalid Num: " <> fromCharArray numS)
+
+  pBlack = char 'B' *> pure (Color Black)
+  pWhite = char 'W' *> pure (Color White)
+
+  pPoint ∷ P Value
+  pPoint = do
+    col ← letter
+    row ← letter
+    pure (Point (pointPos col) (pointPos row))
+    where
+      pointPos ∷ Char → Int
+      pointPos c = toCharCode c - pos0
+      pos0 ∷ Int
+      pos0 = toCharCode 'a'
 
   pNone :: P Value
   pNone = do

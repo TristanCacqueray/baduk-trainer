@@ -32,6 +32,7 @@ checkParser valid expr = do
 goodExprs :: Array String
 goodExprs =
   [ "(;G[1]B[01])"
+  , "(;GM[1]SZ[5]KM[3.5]AB[cb][bc]AW[cd][dd][ed]PL[B];B[bd])"
   , "(;G[]B[11](;N[42]))"
   ]
 
