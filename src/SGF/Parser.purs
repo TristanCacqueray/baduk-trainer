@@ -6,52 +6,20 @@ import Control.Lazy (fix)
 import Data.Array as A
 import Data.Char (toCharCode)
 import Data.Either (Either)
-import Data.List (List, some, many)
+import Data.List (many, some)
 import Data.Number (fromString)
 import Data.Semigroup ((<>))
-import Data.Show (class Show, show)
+import Data.Show (show)
 import Data.String.CodeUnits (fromCharArray)
 import Prelude (bind, pure, ($), (*>), (-))
 import Text.Parsing.Parser (ParseError, Parser, runParser, fail)
 import Text.Parsing.Parser.Combinators (between)
 import Text.Parsing.Parser.String (char, string)
 import Text.Parsing.Parser.Token (digit, letter)
+import SGF.Types (Color(..), GameTree(..), Node, Property(..), SGF, Sequence, Value(..))
 
 type P a
   = Parser String a
-
--- https://www.red-bean.com/sgf/sgf4.html
-type SGF
-  = Collection
-
-type Collection
-  = List GameTree
-
-data GameTree
-  = GameTree Sequence (List GameTree)
-
-type Sequence
-  = (List Node)
-
-type Node
-  = (List Property)
-
-data Property
-  = Prop String (List Value)
-
-data Color = Black | White
-
-data Value
-  = Num Number
-  | Point Int Int
-  | Color Color
-  | None
-
-instance showSGF :: Show GameTree where
-  show _ = "A GameTree"
-
-instance showValue :: Show Value where
-  show _ = "A Value"
 
 propertyValue :: P Value
 propertyValue = pNone <|> (between (string "[") (string "]") $ (pNum <|> pBlack <|> pWhite <|> pPoint))
@@ -64,6 +32,7 @@ propertyValue = pNone <|> (between (string "[") (string "]") $ (pNum <|> pBlack 
       Nothing -> fail ("Invalid Num: " <> fromCharArray numS)
 
   pBlack = char 'B' *> pure (Color Black)
+
   pWhite = char 'W' *> pure (Color White)
 
   pPoint ∷ P Value
@@ -72,10 +41,11 @@ propertyValue = pNone <|> (between (string "[") (string "]") $ (pNum <|> pBlack 
     row ← letter
     pure (Point (pointPos col) (pointPos row))
     where
-      pointPos ∷ Char → Int
-      pointPos c = toCharCode c - pos0
-      pos0 ∷ Int
-      pos0 = toCharCode 'a'
+    pointPos ∷ Char → Int
+    pointPos c = toCharCode c - pos0
+
+    pos0 ∷ Int
+    pos0 = toCharCode 'a'
 
   pNone :: P Value
   pNone = do
