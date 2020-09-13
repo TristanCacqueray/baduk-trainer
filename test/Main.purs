@@ -3,6 +3,7 @@ module Test.Main where
 import Baduk.Converter (load)
 import Control.Monad.Error.Class (class MonadThrow, throwError)
 import Data.Array (concat)
+import Data.Array as A
 import Data.Either (Either(..))
 import Data.Functor (map)
 import Data.List (List)
@@ -23,7 +24,11 @@ checkLoader :: forall m. MonadThrow Error m => List GameTree -> m Unit
 checkLoader sgf = do
   case load sgf of
     Left err → throwError (error err)
-    Right (Tuple _ _) → pure unit
+    Right (Tuple _ logs) →
+      if A.null logs then
+        pure unit
+      else
+        throwError (error $ "loading logs: " <> show logs)
 
 checkParser :: forall m. MonadThrow Error m => Boolean -> String -> m Unit
 checkParser valid expr = do

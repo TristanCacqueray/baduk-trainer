@@ -2,6 +2,7 @@ module Baduk.Types where
 
 import SGF.Types (Color(..))
 import Data.Array
+import Data.Maybe (Maybe(..))
 import Data.Eq (class Eq)
 import Data.List (List(Nil))
 import Prelude (class Show, show, (<>))
@@ -28,6 +29,7 @@ type Player
 
 type Game
   = { size :: Int
+    , next :: Maybe Color
     , black :: Player
     , white :: Player
     , board :: Array Position
@@ -44,4 +46,4 @@ initPlayer :: Player
 initPlayer = { stones: Nil }
 
 initGame :: Game
-initGame = { size: 0, black: initPlayer, white: initPlayer, board: [] }
+initGame = { size: 0, next: Nothing, black: initPlayer, white: initPlayer, board: [] }

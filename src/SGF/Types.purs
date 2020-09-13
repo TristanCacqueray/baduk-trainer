@@ -70,7 +70,7 @@ demo = game : Nil
   game = GameTree seq Nil
 
   seq ∷ Sequence
-  seq = (size : Nil) : (pos Black : Nil) : Nil
+  seq = (size : Nil) : (pos Black : Nil) : (player Black : Nil) : Nil
 
   size ∷ Property
   size = Prop "SZ" (Num 5.0 : Nil)
@@ -81,3 +81,6 @@ demo = game : Nil
     colorName Black = "AB"
 
     colorName White = "AW"
+
+  player ∷ Color → Property
+  player col = Prop "PL" (Color col : Nil)

@@ -39,6 +39,8 @@ loader fsgf = case onlyHead fsgf of
   go ∷ Property → Loader Game
   go (Prop "SZ" (Num n : Nil)) = modify (\game → game { size = round n })
 
+  go (Prop "PL" (Color col : Nil)) = modify (\game → game { next = Just col })
+
   go (Prop "AB" vals) = addStones Black vals
 
   go (Prop "AW" vals) = addStones White vals
