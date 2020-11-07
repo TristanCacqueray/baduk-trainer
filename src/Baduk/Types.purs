@@ -30,6 +30,7 @@ type Player
 type Game
   = { size :: Int
     , next :: Maybe Color
+    , move :: Maybe Coord
     , black :: Player
     , white :: Player
     , board :: Array Position
@@ -46,4 +47,4 @@ initPlayer :: Player
 initPlayer = { stones: Nil }
 
 initGame :: Game
-initGame = { size: 0, next: Nothing, black: initPlayer, white: initPlayer, board: [] }
+initGame = { size: 0, next: Nothing, move: Nothing, black: initPlayer, white: initPlayer, board: [] }
