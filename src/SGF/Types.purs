@@ -4,6 +4,7 @@ import Control.Semigroupoid ((<<<))
 import Data.List (List(..), concat, concatMap, null, singleton, (:))
 import Data.Monoid ((<>))
 import Prelude (class Show, map, otherwise, show)
+import Data.Eq
 
 -- https://www.red-bean.com/sgf/sgf4.html
 type SGF
@@ -46,6 +47,13 @@ instance showProp ∷ Show Property where
 instance showColor ∷ Show Color where
   show Black = "B"
   show White = "W"
+
+derive instance eqColor :: Eq Color
+
+showHexColor :: Color -> String
+showHexColor Black = "#000"
+
+showHexColor White = "#FFF"
 
 type FlatSGF
   = List (List Property)
