@@ -7,13 +7,14 @@ import Data.Array as A
 import Data.Char (toCharCode)
 import Data.Either (Either)
 import Data.List (many, some)
+import Data.Tuple
 import Data.Number (fromString)
 import Data.Semigroup ((<>))
 import Data.Show (show)
 import Data.String.CodeUnits (fromCharArray)
-import Prelude (bind, pure, ($), (*>), (-))
+import Prelude (bind, pure, ($), (*>), (-), (>>=))
 import Text.Parsing.Parser (ParseError, Parser, runParser, fail)
-import Text.Parsing.Parser.Combinators (between)
+import Text.Parsing.Parser.Combinators (between, lookAhead, try)
 import Text.Parsing.Parser.String (char, string)
 import Text.Parsing.Parser.Token (digit, letter)
 import SGF.Types (Color(..), GameTree(..), Node, Property(..), SGF, Sequence, Value(..))
@@ -22,18 +23,34 @@ type P a
   = Parser String a
 
 propertyValue :: P Value
-propertyValue = pNone <|> (between (string "[") (string "]") $ (pNum <|> pBlack <|> pWhite <|> pPoint))
+propertyValue =
+  pNone
+    <|> (between (string "[") (string "]") $ try pDate <|> pNum <|> pBlack <|> pWhite <|> pPoint)
+    >>= \v -> optional (string "\n") >>= \_ -> pure v
   where
+  num s = fromString (fromCharArray s)
+
   pNum :: P Value
   pNum = do
     numS <- A.some (digit <|> char '.')
-    case fromString (fromCharArray numS) of
+    case num numS of
       Just a -> pure $ Num a
       Nothing -> fail ("Invalid Num: " <> fromCharArray numS)
 
   pBlack = char 'B' *> pure (Color Black)
 
   pWhite = char 'W' *> pure (Color White)
+
+  pDate :: P Value
+  pDate = do
+    numY <- A.some digit
+    _ <- char '-'
+    numM <- A.some digit
+    _ <- char '-'
+    numD <- A.some digit
+    case [ num numY, num numM, num numD ] of
+      [ Just y, Just m, Just d ] -> pure (Date y m d)
+      _ -> fail ("Invalid Date")
 
   pPoint ∷ P Value
   pPoint = do

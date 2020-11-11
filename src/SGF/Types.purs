@@ -32,6 +32,7 @@ data Color
 data Value
   = Num Number
   | Point Int Int
+  | Date Number Number Number
   | Color Color
   | None
 
