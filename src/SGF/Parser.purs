@@ -65,8 +65,8 @@ propertyValue =
 
 propertyName :: P String
 propertyName = do
-  lets <- some letter
-  pure $ show lets
+  lets <- A.some letter
+  pure $ fromCharArray lets
 
 property :: P Property
 property = do
