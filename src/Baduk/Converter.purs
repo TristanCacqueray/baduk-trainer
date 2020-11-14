@@ -43,7 +43,11 @@ loader fsgf = case onlyHead fsgf of
 
   go (Prop "AB" vals) = addStones Black vals
 
+  go (Prop "B" vals) = addStones Black vals
+
   go (Prop "AW" vals) = addStones White vals
+
+  go (Prop "W" vals) = addStones White vals
 
   go (Prop name _) = tell [ "Unknown property " <> name ] *> get
 
@@ -52,8 +56,8 @@ loader fsgf = case onlyHead fsgf of
     Just points →
       modify
         ( \game → case color of
-            Black → game { black = game.black { stones = points } }
-            White → game { white = game.white { stones = points } }
+            Black → game { black = game.black { stones = game.black.stones <> points } }
+            White → game { white = game.white { stones = game.white.stones <> points } }
         )
     Nothing → throwError ("Invalid stones value for " <> show color)
 
