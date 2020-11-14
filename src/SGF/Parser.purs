@@ -1,21 +1,18 @@
 module SGF.Parser where
 
-import Data.Maybe
+import Data.Maybe (Maybe(..), optional)
 import Control.Alt ((<|>))
 import Control.Lazy (fix)
 import Data.Array as A
 import Data.Char (toCharCode)
 import Data.Either (Either)
 import Data.List (many, some)
-import Data.Tuple
 import Data.Number (fromString)
-import Data.Semigroup ((<>))
-import Data.Show (show)
 import Data.String.CodeUnits (fromCharArray)
-import Prelude (bind, pure, ($), (*>), (-), (>>=))
+import Prelude (bind, pure, (>>=), ($), (<>), (-), (/=), show)
 import Text.Parsing.Parser (ParseError, Parser, runParser, fail)
-import Text.Parsing.Parser.Combinators (between, lookAhead, try)
-import Text.Parsing.Parser.String (char, string)
+import Text.Parsing.Parser.Combinators (between, try)
+import Text.Parsing.Parser.String (char, string, satisfy)
 import Text.Parsing.Parser.Token (digit, letter)
 import SGF.Types (Color(..), GameTree(..), Node, Property(..), SGF, Sequence, Value(..))
 
@@ -24,8 +21,7 @@ type P a
 
 propertyValue :: P Value
 propertyValue =
-  pNone
-    <|> (between (string "[") (string "]") $ try pDate <|> pNum <|> pBlack <|> pWhite <|> pPoint)
+  pNone <|> (between (string "[") (string "]") $ try pDate <|> pNum <|> pText)
     >>= \v -> optional (string "\n") >>= \_ -> pure v
   where
   num s = fromString (fromCharArray s)
@@ -36,10 +32,6 @@ propertyValue =
     case num numS of
       Just a -> pure $ Num a
       Nothing -> fail ("Invalid Num: " <> fromCharArray numS)
-
-  pBlack = char 'B' *> pure (Color Black)
-
-  pWhite = char 'W' *> pure (Color White)
 
   pDate :: P Value
   pDate = do
@@ -52,17 +44,19 @@ propertyValue =
       [ Just y, Just m, Just d ] -> pure (Date y m d)
       _ -> fail ("Invalid Date")
 
-  pPoint ∷ P Value
-  pPoint = do
-    col ← letter
-    row ← letter
-    pure (Point (pointPos col) (pointPos row))
+  pText :: P Value
+  pText = do
+    txt <- (A.some $ satisfy ((/=) ']'))
+    pure
+      ( case txt of
+          [ 'B' ] -> Color Black
+          [ 'W' ] -> Color White
+          [ a, b ] -> Point (pointPos a) (pointPos b)
+          _ -> Text (fromCharArray txt)
+      )
     where
     pointPos ∷ Char → Int
-    pointPos c = toCharCode c - pos0
-
-    pos0 ∷ Int
-    pos0 = toCharCode 'a'
+    pointPos c = toCharCode c - toCharCode 'a'
 
   pNone :: P Value
   pNone = do
