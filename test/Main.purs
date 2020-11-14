@@ -1,6 +1,8 @@
 module Test.Main where
 
+import Data.Maybe (Maybe(..))
 import Baduk.Converter (load)
+import Data.Array (intercalate)
 import Control.Monad.Error.Class (class MonadThrow, throwError)
 import Data.Array (concat)
 import Data.Array as A
@@ -13,9 +15,11 @@ import Data.Tuple (Tuple(..))
 import Effect (Effect)
 import Effect.Aff (launchAff_)
 import Effect.Exception (Error, error)
-import Prelude (Unit, pure, show, unit, ($), (<>), discard)
+import Prelude (Unit, pure, show, unit, ($), (<>), (==), discard)
 import SGF.Parser (parse)
 import SGF.Types (GameTree, demo)
+import SGF (loadBaduk)
+import Baduk.Types (showGame)
 import Test.Spec (describe, it)
 import Test.Spec.Reporter.Console (consoleReporter)
 import Test.Spec.Runner (runSpec)
@@ -65,7 +69,37 @@ main =
           describe "Parser" $ sequence_ parserTests
           describe "Converter" do
             it "load demo sgf" (checkLoader demo)
+            it "print game" checkShowGame
   where
+  sgfStr =
+    intercalate "\n"
+      [ "(;GM[1]FF[4]"
+      , "SZ[5]"
+      , "DT[2020-11-08]"
+      , "AP[GNU Go:3.9.1]"
+      , "C[load and analyze mode]"
+      , ";B[bb]W[cc])"
+      ]
+
+  gameStr =
+    intercalate "\n"
+      [ "[.,.,.,.,.]"
+      , "[b,.,.,.,.]"
+      , "[.,w,.,.,.]"
+      , "[.,.,.,.,.]"
+      , "[.,.,.,.,.]"
+      , ""
+      ]
+
+  checkShowGame :: forall m. MonadThrow Error m => m Unit
+  checkShowGame = case loadBaduk sgfStr of
+    Just g ->
+      if showGame g == gameStr then
+        pure unit
+      else
+        throwError (error $ showGame g)
+    Nothing -> throwError (error "Couldn't load game")
+
   parserTests =
     concat
       [ map (\expr → (it ("parse " <> expr) $ checkParser true expr)) goodExprs
