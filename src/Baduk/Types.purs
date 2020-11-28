@@ -47,4 +47,4 @@ initPlayer :: Player
 initPlayer = { stones: Nil }
 
 initGame :: Game
-initGame = { size: 0, next: Nothing, move: Nothing, black: initPlayer, white: initPlayer, board: [] }
+initGame = { size: 19, next: Nothing, move: Nothing, black: initPlayer, white: initPlayer, board: [] }
