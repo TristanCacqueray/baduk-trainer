@@ -12,6 +12,7 @@ You can edit this file as you like.
   , "spec"
   , "numbers"
   , "strings"
+  , "tuples"
   , "transformers"
   , "halogen"
   , "canvas"

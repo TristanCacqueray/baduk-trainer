@@ -9,7 +9,7 @@ import Data.Int (round, toNumber)
 import Data.List (range)
 import Data.Maybe (Maybe(..))
 import Data.Traversable (for_, sequence, traverse)
-import Data.Tuple (Tuple(..))
+import Data.Tuple (Tuple(..), uncurry)
 import Effect (Effect)
 import Effect.Class (class MonadEffect, liftEffect)
 import Effect.Console (log)
@@ -23,6 +23,7 @@ import Halogen.HTML.Core (PropName(..), ClassName(..))
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Halogen.VDom.Driver (runUI)
+import Data.Ord (abs)
 import Math as Math
 import SGF (loadBaduk)
 import SGF.Parser (parse)
@@ -59,8 +60,8 @@ renderStoneSelection color (Selected selected) canvas = do
 
   r = w / 2.0
 
-renderBoard :: Canvas.Context2D -> Game -> Effect Unit
-renderBoard ctx game =
+renderBoard :: Canvas.Context2D -> Maybe (Tuple Coord (Maybe Color)) -> Game -> Effect Unit
+renderBoard ctx selection game =
   withContext ctx do
     -- Background
     setFillStyle ctx "#966F33"
@@ -79,19 +80,58 @@ renderBoard ctx game =
             Canvas.moveTo ctx boardPadding startPos
             Canvas.lineTo ctx endPos startPos
             Canvas.closePath ctx
+    -- Selection
+    for_ selection (\(Tuple coord color) -> for_ color (flip renderStone coord))
     -- Stone
     for_ (game.black.stones) (renderStone Black)
     for_ (game.white.stones) (renderStone White)
+    -- Removal
+    for_ selection renderClear
   where
   boardSize' = toNumber $ boardSize game.size
 
   coordPos :: Int -> Number
   coordPos x = boardPadding + toNumber x * stoneSize
 
+  renderClear :: Tuple Coord (Maybe Color) -> Effect Unit
+  renderClear (Tuple (Coord x y) color) = case color of
+    Just _ -> pure unit
+    Nothing -> do
+      Canvas.strokePath ctx
+        $ do
+            let
+              xPos = boardPadding + stoneSize * (toNumber x)
+
+              yPos = boardPadding + stoneSize * (toNumber y)
+
+              l = 10.0
+            Canvas.setStrokeStyle ctx "lightblue"
+            Canvas.setLineWidth ctx 2.5
+            Canvas.moveTo ctx (xPos - l) (yPos - l)
+            Canvas.lineTo ctx (xPos + l) (yPos + l)
+            Canvas.moveTo ctx (xPos - l) (yPos + l)
+            Canvas.lineTo ctx (xPos + l) (yPos - l)
+            Canvas.closePath ctx
+
   renderStone :: Color -> Coord -> Effect Unit
   renderStone color (Coord x y) = do
     setFillStyle ctx (showHexColor color)
     fillPath ctx $ arc ctx { x: (coordPos x), y: (coordPos y), radius: 25.0 * 0.8, start: 0.0, end: Math.pi * 2.0 }
+
+snapPos :: Int -> Int -> Maybe Coord
+snapPos x' y' = case (x' > 6 && y' > 6 && modX > 10.0 && modY > 10.0) of
+  true -> Just (Coord (round $ (abs x) / stoneSize) (round $ (abs y) / stoneSize))
+  false -> Nothing
+  where
+  x :: Number
+  x = (toNumber x' - boardPadding)
+
+  y :: Number
+  y = (toNumber y' - boardPadding)
+
+  modX = abs $ (x `mod` stoneSize) - 25.0
+
+  modY = abs $ (y `mod` stoneSize) - 25.0
 
 boardPadding :: Number
 boardPadding = 30.0
@@ -162,11 +202,21 @@ instance showStoneSelector :: Show StoneSelector where
   show AddWhiteStone = "Add white"
   show RemoveStone = "Remove color"
 
+stoneSelectorToColor :: StoneSelector -> Maybe Color
+stoneSelectorToColor s = case s of
+  AddBlackStone -> Just Black
+  AddWhiteStone -> Just White
+  RemoveStone -> Nothing
+
 type State
-  = { editColor :: StoneSelector, message :: String, game :: Game }
+  = { editColor :: StoneSelector
+    , editPos :: Maybe (Tuple Coord (Maybe Color))
+    , message :: String
+    , game :: Game
+    }
 
 initialSGFEditorState :: forall input. Game -> input -> State
-initialSGFEditorState game _ = { editColor: AddBlackStone, message: "", game }
+initialSGFEditorState game _ = { editColor: AddBlackStone, editPos: Nothing, message: "", game }
 
 -- Render
 renderSGFEditor :: forall m. MonadEffect m => State -> H.ComponentHTML Action () m
@@ -195,6 +245,8 @@ renderSGFEditor state = do
         , HP.height boardSize'
         , HP.prop (PropName "style") "border: 1px solid black"
         , HE.onClick \e -> Just $ AddStone e
+        , HE.onMouseMove \e -> Just $ MouseMove e
+        , HE.onMouseLeave \e -> Just ClearSelection
         ]
   HH.div
     [ HP.class_ (ClassName "container") ]
@@ -231,6 +283,8 @@ data Action
   | SelectWhiteStone
   | SelectClearStone
   | AddStone MouseEvent
+  | MouseMove MouseEvent
+  | ClearSelection
 
 handleSGFEditorAction :: forall output m. MonadEffect m => Action -> H.HalogenM State Action () output m Unit
 handleSGFEditorAction = case _ of
@@ -244,6 +298,25 @@ handleSGFEditorAction = case _ of
   SelectClearStone -> do
     H.modify_ \s -> s { editColor = RemoveStone }
     drawCanvases
+  ClearSelection -> do
+    H.modify_ \s -> s { editPos = Nothing }
+    drawCanvases
+  MouseMove e -> do
+    pos' <- liftEffect $ relativePosition e
+    case pos' of
+      Just pos -> case snapPos pos.x pos.y of
+        Just coord -> do
+          state <- H.get
+          let
+            editPos = Just (Tuple coord (stoneSelectorToColor state.editColor))
+          case editPos /= state.editPos of
+            true -> do
+              H.modify_ \s -> s { editPos = editPos }
+              liftEffect $ logShow ("Moving: " <> show pos.x)
+              drawCanvases
+            false -> pure unit
+        Nothing -> H.modify_ \s -> s { editPos = Nothing }
+      Nothing -> pure unit
   AddStone e -> do
     pos' <- liftEffect $ relativePosition e
     case pos' of
@@ -264,6 +337,6 @@ handleSGFEditorAction = case _ of
           renderStoneSelection Black (Selected $ state.editColor == AddBlackStone) blackCanvas
           renderStoneSelection White (Selected $ state.editColor == AddWhiteStone) whiteCanvas
           boardCtx <- Canvas.getContext2D boardCanvas
-          renderBoard boardCtx state.game
+          renderBoard boardCtx state.editPos state.game
           logShow "Drawing..."
         _ -> logShow "Where are the canvases?!"
