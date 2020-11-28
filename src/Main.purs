@@ -1,16 +1,14 @@
 module Main where
 
-import Baduk.Types
-import Prelude
-import Baduk.Converter (load)
 import Baduk.Game as Baduk
+import Baduk.Types (Coord(..), Game)
 import Data.Array (intercalate)
-import Data.Either (Either(..))
 import Data.Int (round, toNumber)
 import Data.List (range)
 import Data.Maybe (Maybe(..))
+import Data.Ord (abs)
 import Data.Traversable (for_, sequence, traverse)
-import Data.Tuple (Tuple(..), uncurry)
+import Data.Tuple (Tuple(..))
 import Effect (Effect)
 import Effect.Class (class MonadEffect, liftEffect)
 import Effect.Console (log)
@@ -24,10 +22,9 @@ import Halogen.HTML.Core (PropName(..), ClassName(..))
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Halogen.VDom.Driver (runUI)
-import Data.Ord (abs)
 import Math as Math
+import Prelude
 import SGF (loadBaduk)
-import SGF.Parser (parse)
 import SGF.Types (Color(..), showHexColor)
 import Web.Event.Event as WE
 import Web.HTML.HTMLElement as HTMLElement
@@ -270,9 +267,9 @@ renderSGFEditor state = do
             [ HP.class_ (ClassName "col") ]
             [ mkBoard
             , HH.pre
-                [ HP.prop (PropName "style") ("width: " <> show boardSize' <> "px; background: black; color: white")
+                [ HP.prop (PropName "style") ("width: " <> show boardSize' <> "px; background: black; color: white; white-space: pre-wrap;")
                 ]
-                [ HH.text "(SGF;)" ]
+                [ HH.text (Baduk.save state.game) ]
             ]
         ]
     ]
