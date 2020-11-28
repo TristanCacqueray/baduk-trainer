@@ -3,6 +3,7 @@ module Main where
 import Baduk.Types
 import Prelude
 import Baduk.Converter (load)
+import Baduk.Game as Baduk
 import Data.Array (intercalate)
 import Data.Either (Either(..))
 import Data.Int (round, toNumber)
@@ -312,17 +313,24 @@ handleSGFEditorAction = case _ of
           case editPos /= state.editPos of
             true -> do
               H.modify_ \s -> s { editPos = editPos }
-              liftEffect $ logShow ("Moving: " <> show pos.x)
               drawCanvases
             false -> pure unit
         Nothing -> H.modify_ \s -> s { editPos = Nothing }
       Nothing -> pure unit
   AddStone e -> do
     pos' <- liftEffect $ relativePosition e
+    state <- H.get
     case pos' of
       Just pos -> do
         liftEffect $ logShow $ "Clicked: " <> show pos.x <> " " <> show pos.y
         H.modify_ \s -> s { message = "  | clicked: " <> show pos.x <> " " <> show pos.y }
+        case state.editPos of
+          Just (Tuple coord color') -> do
+            case color' of
+              Just color -> H.modify_ \s -> s { game = Baduk.setStone state.game coord color }
+              Nothing -> H.modify_ \s -> s { game = Baduk.removeStone state.game coord }
+            drawCanvases
+          Nothing -> pure unit
       Nothing -> liftEffect $ logShow "Unknown event source?!"
   where
   getCanvases :: Array String -> Effect (Array (Maybe CanvasElement))
