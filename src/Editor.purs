@@ -29,7 +29,10 @@ import Web.UIEvent.MouseEvent (MouseEvent, clientX, clientY, toEvent)
 type Input
   = String
 
-component :: forall query output m. MonadEffect m => H.Component HH.HTML query Input output m
+type Output
+  = Maybe String
+
+component :: forall query m. MonadEffect m => H.Component HH.HTML query Input Output m
 component =
   H.mkComponent
     { initialState: initialSGFEditorState
@@ -251,6 +254,14 @@ renderSGFEditor state = do
             [ HP.class_ (ClassName "col") ]
             [ mkBoard
             , renderMignature (show boardSize' <> "px") (Baduk.save state.game)
+            , HH.div_
+                [ HH.a
+                    [ HP.class_ (ClassName "btn btn-primary"), HE.onClick \s -> Just $ Save ]
+                    [ HH.text "Save" ]
+                , HH.a
+                    [ HP.class_ (ClassName "btn btn-secondary"), HE.onClick \s -> Just $ Cancel ]
+                    [ HH.text "Cancel" ]
+                ]
             ]
         ]
     ]
@@ -264,8 +275,10 @@ data Action
   | AddStone MouseEvent
   | MouseMove MouseEvent
   | ClearSelection
+  | Save
+  | Cancel
 
-handleSGFEditorAction :: forall output m. MonadEffect m => Action -> H.HalogenM State Action () output m Unit
+handleSGFEditorAction :: forall m. MonadEffect m => Action -> H.HalogenM State Action () Output m Unit
 handleSGFEditorAction = case _ of
   Initialize -> drawCanvases
   SelectBlackStone -> do
@@ -280,6 +293,10 @@ handleSGFEditorAction = case _ of
   ClearSelection -> do
     H.modify_ \s -> s { editPos = Nothing }
     drawCanvases
+  Save -> do
+    state <- H.get
+    H.raise $ Just (Baduk.save state.game)
+  Cancel -> H.raise Nothing
   MouseMove e -> do
     pos' <- liftEffect $ relativePosition e
     case pos' of

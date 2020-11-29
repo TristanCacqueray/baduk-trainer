@@ -8,6 +8,8 @@ import Data.Symbol (SProxy(..))
 import Editor as Editor
 import Effect (Effect)
 import Effect.Class (class MonadEffect)
+import Effect.Console (log)
+import Halogen (liftEffect)
 import Halogen as H
 import Halogen.Aff (awaitBody, runHalogenAff)
 import Halogen.HTML as HH
@@ -17,7 +19,7 @@ import Halogen.HTML.Properties as HP
 import Halogen.VDom.Driver (runUI)
 
 type Slots
-  = ( editor :: forall query. H.Slot query Void Int )
+  = ( editor :: forall query. H.Slot query Editor.Output Int )
 
 editor = SProxy :: SProxy "editor"
 
@@ -48,11 +50,12 @@ type Input
 
 data Mode
   = ShowGames
-  | EditGame String
-  | PlayGame String
+  | EditGame Int String
+  | PlayGame Int String
 
 data Action
   = SwitchMode Mode
+  | Edited Int (Maybe String)
 
 isHome :: Mode -> Boolean
 isHome = case _ of
@@ -78,9 +81,24 @@ badukTrainer =
 initialState :: Input -> State
 initialState { trainingGames } = { trainingGames, mode: ShowGames }
 
+replaceGame :: Int -> String -> List String -> List String
+replaceGame idx gameStr = go 0
+  where
+  go :: Int -> List String -> List String
+  go n = case _ of
+    Nil -> Nil
+    Cons x xs -> Cons (if n == idx then gameStr else x) (go (n + 1) xs)
+
 handleAction :: forall output m. MonadEffect m => Action -> H.HalogenM State Action Slots output m Unit
 handleAction = case _ of
   SwitchMode mode -> H.modify_ \s -> s { mode = mode }
+  Edited idx maybeGame -> do
+    state <- H.get
+    let
+      newGames = case maybeGame of
+        Just g -> replaceGame idx g state.trainingGames
+        Nothing -> state.trainingGames
+    H.modify_ \s -> s { trainingGames = newGames, mode = ShowGames }
 
 -- Render
 render :: forall m. MonadEffect m => State -> H.ComponentHTML Action Slots m
@@ -102,8 +120,8 @@ render state =
 
   body = case state.mode of
     ShowGames -> [ HH.h1_ [ HH.text "Select a training game" ] ] <> (toUnfoldable $ mapWithIndex renderGamePicker state.trainingGames)
-    EditGame s -> [ HH.slot editor 0 Editor.component s absurd ]
-    PlayGame n -> [ HH.text "playing game" ]
+    EditGame n s -> [ HH.slot editor 0 Editor.component s (Just <<< Edited n) ]
+    PlayGame n s -> [ HH.text "playing game" ]
 
   clk mode = HE.onClick \e -> Just (SwitchMode mode)
 
@@ -115,12 +133,12 @@ render state =
           [ Editor.renderMignature "auto" gameStr
           , HH.a
               [ HP.class_ (ClassName "btn btn-primary")
-              , clk (PlayGame gameStr)
+              , clk (PlayGame idx gameStr)
               ]
               [ HH.text "play" ]
           , HH.a
               [ HP.class_ (ClassName "btn btn-secondary")
-              , clk (EditGame gameStr)
+              , clk (EditGame idx gameStr)
               ]
               [ HH.text "edit" ]
           ]
