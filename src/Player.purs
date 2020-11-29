@@ -9,10 +9,11 @@ import Data.Time.Duration (Milliseconds(..))
 import Data.Tuple (Tuple(..))
 import Editor as Editor
 import Effect (Effect)
-import Effect.Aff (delay)
+import Effect.Aff (Aff, delay)
 import Effect.Aff.Class (class MonadAff)
-import Effect.Class (class MonadEffect)
+import Effect.Class (class MonadEffect, liftEffect)
 import Effect.Console (log)
+import GnuGO as GnuGO
 import Graphics.Canvas (getCanvasElementById)
 import Graphics.Canvas as Canvas
 import Halogen (liftEffect)
@@ -21,11 +22,14 @@ import Halogen.HTML as HH
 import Halogen.HTML.Core (PropName(..), ClassName(..))
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
+import SGF as SGF
 import SGF.Types (Color(..))
 import Web.UIEvent.MouseEvent (MouseEvent)
 
 type Input
-  = Baduk.Game
+  = { game :: Baduk.Game
+    , gnugo :: Maybe GnuGO.WASM
+    }
 
 type Output
   = Maybe Result
@@ -55,15 +59,17 @@ data Status
 
 type State
   = { initialGame :: Baduk.Game
+    , gnugo :: Maybe GnuGO.WASM
     , game :: Baduk.Game
     , editCoord :: Maybe Coord
     , status :: Status
     }
 
 initialState :: Input -> State
-initialState game =
-  { initialGame: game
-  , game: game
+initialState input =
+  { initialGame: input.game
+  , gnugo: input.gnugo
+  , game: input.game
   , editCoord: Nothing
   , status: WaitingHuman
   }
@@ -120,15 +126,26 @@ render state =
           ]
       ]
 
-aiPlay :: Baduk.Game -> Effect Baduk.Game
-aiPlay g = pure g
+aiPlay :: GnuGO.WASM -> Baduk.Game -> Effect Baduk.Game
+aiPlay gnugo game = do
+  let
+    gameStr = Baduk.save game (Just White)
+  log ("sending: " <> gameStr)
+  let
+    newGameStr = GnuGO.play gnugo 0 gameStr
+  log ("received: " <> newGameStr)
+  case SGF.loadBaduk newGameStr of
+    Just g -> pure g
+    Nothing -> do
+      log ("Couldn't load")
+      pure game
 
 handleAction :: forall m. MonadAff m => Action -> H.HalogenM State Action () Output m Unit
 handleAction = case _ of
   Resign -> H.raise (Just Loss)
   Restart -> do
     state <- H.get
-    H.modify_ \_ -> initialState state.initialGame
+    H.modify_ \_ -> initialState { game: state.initialGame, gnugo: state.gnugo }
     drawBoard
   Draw -> drawBoard
   MouseMove e -> do
@@ -154,9 +171,16 @@ handleAction = case _ of
         H.modify_ \s -> s { game = newGame, status = WaitingAI }
         _ <-
           H.fork do
-            H.liftAff (delay $ Milliseconds 1000.0)
-            game <- liftEffect $ aiPlay newGame
-            H.modify_ \s -> s { game = newGame, status = WaitingHuman }
+            newGame' <- case state.gnugo of
+              Nothing -> do
+                H.liftAff (delay $ Milliseconds 1000.0)
+                -- Fake a move
+                pure newGame
+              Just gnugo -> do
+                g <- H.liftAff $ liftEffect $ aiPlay gnugo newGame
+                pure g
+            H.modify_ \s -> s { game = newGame', status = WaitingHuman }
+            drawBoard
         pure unit
   MouseLeave -> do
     H.modify_ \s -> s { editCoord = Nothing }

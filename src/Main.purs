@@ -20,6 +20,7 @@ import Halogen.HTML.Properties as HP
 import Halogen.VDom.Driver (runUI)
 import Player as Player
 import SGF as SGF
+import GnuGO as GnuGO
 
 type Slots
   = ( editor :: Editor.Slot Unit
@@ -46,14 +47,21 @@ defaultGames =
     Nil
 
 -- Halogen entrypoint
-main :: Effect Unit
-main =
+mainWasm :: Maybe GnuGO.WASM -> Effect Unit
+mainWasm wasm = do
   runHalogenAff do
     body <- awaitBody
-    runUI badukTrainer { trainingGames: defaultGames } body
+    runUI badukTrainer { trainingGames: defaultGames, gnugo: wasm } body
+
+main :: Effect Unit
+main = mainL
+  where
+  mainL = GnuGO.withWasm "/wasm-gnugo/gnugo.wasm" (\m -> mainWasm (Just m))
+
+  mainQ = mainWasm Nothing
 
 type Input
-  = { trainingGames :: List String }
+  = { trainingGames :: List String, gnugo :: Maybe GnuGO.WASM }
 
 data Mode
   = ShowGames
@@ -76,7 +84,7 @@ homeNavClass m = case isHome m of
   false -> ""
 
 type State
-  = { trainingGames :: List String, mode :: Mode }
+  = { trainingGames :: List String, gnugo :: Maybe GnuGO.WASM, mode :: Mode }
 
 badukTrainer :: forall query output m. MonadAff m => MonadEffect m => H.Component HH.HTML query Input output m
 badukTrainer =
@@ -87,7 +95,7 @@ badukTrainer =
     }
 
 initialState :: Input -> State
-initialState { trainingGames } = { trainingGames, mode: ShowGames }
+initialState { trainingGames, gnugo } = { trainingGames, gnugo, mode: ShowGames }
 
 replaceGame :: Int -> String -> List String -> List String
 replaceGame idx gameStr = go 0
@@ -133,7 +141,7 @@ render state =
     ShowGames -> [ HH.h1_ [ HH.text "Select a training game" ] ] <> (toUnfoldable $ mapWithIndex renderGamePicker state.trainingGames)
     EditGame n s -> [ HH.slot editor unit Editor.component s (Just <<< Edited n) ]
     PlayGame n s -> case SGF.loadBaduk s of
-      Just g -> [ HH.slot player unit Player.component g (Just <<< Played n) ]
+      Just g -> [ HH.slot player unit Player.component { game: g, gnugo: state.gnugo } (Just <<< Played n) ]
       Nothing -> [ HH.text ("Invalid game: " <> s) ]
 
   clk mode = HE.onClick \e -> Just (SwitchMode mode)

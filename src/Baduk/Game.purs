@@ -37,11 +37,15 @@ saveCoord (Coord x y) = "[" <> savePos x <> savePos y <> "]"
   savePos :: Int -> String
   savePos p = fromMaybe "" $ singleton <$> fromCharCode (toCharCode 'a' + p)
 
-save :: Game -> String
-save g =
+save :: Game -> Maybe Color -> String
+save g c =
   intercalate "\n"
-    [ "(;SZ[" <> show g.size <> "]"
+    [ "(;SZ[" <> show g.size <> "]" <> startPlayer
     , ";B" <> foldMap saveCoord g.black.stones
     , ";W" <> foldMap saveCoord g.white.stones
-    , ")"
+    , startPlayer <> ")"
     ]
+  where
+  startPlayer = case c of
+    Just c -> ";PL[" <> show c <> "]"
+    Nothing -> ""

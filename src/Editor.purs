@@ -256,7 +256,7 @@ renderSGFEditor state = do
         , HH.div
             [ HP.class_ (ClassName "col") ]
             [ mkBoard
-            , renderMignature (show boardSize' <> "px") (Baduk.save state.game)
+            , renderMignature (show boardSize' <> "px") (Baduk.save state.game Nothing)
             , HH.div_
                 [ HH.a
                     [ HP.class_ (ClassName "btn btn-primary"), HE.onClick \s -> Just $ Save ]
@@ -303,7 +303,7 @@ handleSGFEditorAction = case _ of
     drawCanvases
   Save -> do
     state <- H.get
-    H.raise $ Just (Baduk.save state.game)
+    H.raise $ Just (Baduk.save state.game Nothing)
   Cancel -> H.raise Nothing
   MouseMove e -> do
     mCoord <- liftEffect $ mouseCoord e

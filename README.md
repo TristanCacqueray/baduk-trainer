@@ -2,6 +2,11 @@
 
 A purescript binding to gnugo
 
+## Run locally
+
+First build [wasm-gnugo](https://github.com/TristanCacqueray/wasm-gnugo/) in `../`
+Then symlink `ln -s ../../wasm-gnugo/ dist/wasm-gnugo`
+
 ## Update pages
 
 The application is available at [https://tristancacqueray.github.io/pure-gnugo/](https://tristancacqueray.github.io/pure-gnugo/).
