@@ -1,7 +1,8 @@
 module Editor where
 
+import Prelude
 import Baduk.Game as Baduk
-import Baduk.Types (Coord(..), Game)
+import Baduk.Types (Coord(..), Game, initGame)
 import Data.Int (round, toNumber)
 import Data.List (range)
 import Data.Maybe (Maybe(..))
@@ -19,14 +20,14 @@ import Halogen.HTML.Core (PropName(..), ClassName(..))
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Math as Math
-import Prelude
+import SGF (loadBaduk)
 import SGF.Types (Color(..), showHexColor)
 import Web.Event.Event as WE
 import Web.HTML.HTMLElement as HTMLElement
 import Web.UIEvent.MouseEvent (MouseEvent, clientX, clientY, toEvent)
 
 type Input
-  = { game :: Game }
+  = String
 
 component :: forall query output m. MonadEffect m => H.Component HH.HTML query Input output m
 component =
@@ -37,7 +38,11 @@ component =
     }
 
 initialSGFEditorState :: Input -> State
-initialSGFEditorState { game } = { editColor: AddBlackStone, editPos: Nothing, message: "", game }
+initialSGFEditorState sgfStr = { editColor: AddBlackStone, editPos: Nothing, message, game }
+  where
+  Tuple game message = case loadBaduk sgfStr of
+    Just g -> Tuple g ""
+    Nothing -> Tuple initGame ("Invalid sgf: " <> sgfStr)
 
 -- Rendering primitives
 newtype Selected
@@ -189,6 +194,13 @@ type State
     }
 
 -- Render
+renderMignature :: forall a b. String -> String -> HH.HTML a b
+renderMignature width sgfStr =
+  HH.pre
+    [ HP.prop (PropName "style") ("width: " <> width <> "; background: black; color: white; white-space: pre-wrap;")
+    ]
+    [ HH.text sgfStr ]
+
 renderSGFEditor :: forall m. MonadEffect m => State -> H.ComponentHTML Action () m
 renderSGFEditor state = do
   let
@@ -238,10 +250,7 @@ renderSGFEditor state = do
         , HH.div
             [ HP.class_ (ClassName "col") ]
             [ mkBoard
-            , HH.pre
-                [ HP.prop (PropName "style") ("width: " <> show boardSize' <> "px; background: black; color: white; white-space: pre-wrap;")
-                ]
-                [ HH.text (Baduk.save state.game) ]
+            , renderMignature (show boardSize' <> "px") (Baduk.save state.game)
             ]
         ]
     ]
