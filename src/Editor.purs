@@ -136,20 +136,20 @@ renderBoard ctx selection game =
     setFillStyle ctx (showHexColor color)
     fillPath ctx $ arc ctx { x: (coordPos x), y: (coordPos y), radius: 25.0 * 0.8, start: 0.0, end: Math.pi * 2.0 }
 
-snapPos :: Int -> Int -> Maybe Coord
-snapPos x' y' = case (x' > 6 && y' > 6 && modX > 10.0 && modY > 10.0) of
-  true -> Just (Coord (round $ (abs x) / stoneSize) (round $ (abs y) / stoneSize))
+snapPos :: { x :: Int, y :: Int } -> Maybe Coord
+snapPos { x, y } = case (x > 6 && y > 6 && modX > 10.0 && modY > 10.0) of
+  true -> Just (Coord (round $ (abs xN) / stoneSize) (round $ (abs yN) / stoneSize))
   false -> Nothing
   where
-  x :: Number
-  x = (toNumber x' - boardPadding)
+  xN :: Number
+  xN = (toNumber x - boardPadding)
 
-  y :: Number
-  y = (toNumber y' - boardPadding)
+  yN :: Number
+  yN = (toNumber y - boardPadding)
 
-  modX = abs $ (x `mod` stoneSize) - 25.0
+  modX = abs $ (xN `mod` stoneSize) - 25.0
 
-  modY = abs $ (y `mod` stoneSize) - 25.0
+  modY = abs $ (yN `mod` stoneSize) - 25.0
 
 boardPadding :: Number
 boardPadding = 30.0
@@ -281,6 +281,11 @@ data Action
   | Save
   | Cancel
 
+mouseCoord :: MouseEvent -> Effect (Maybe Coord)
+mouseCoord e = do
+  pos <- relativePosition e
+  pure (join $ snapPos <$> pos)
+
 handleSGFEditorAction :: forall m. MonadEffect m => Action -> H.HalogenM State Action () Output m Unit
 handleSGFEditorAction = case _ of
   Initialize -> drawCanvases
@@ -301,20 +306,18 @@ handleSGFEditorAction = case _ of
     H.raise $ Just (Baduk.save state.game)
   Cancel -> H.raise Nothing
   MouseMove e -> do
-    pos' <- liftEffect $ relativePosition e
-    case pos' of
-      Just pos -> case snapPos pos.x pos.y of
-        Just coord -> do
-          state <- H.get
-          let
-            editPos = Just (Tuple coord (stoneSelectorToColor state.editColor))
-          case editPos /= state.editPos of
-            true -> do
-              H.modify_ \s -> s { editPos = editPos }
-              drawCanvases
-            false -> pure unit
-        Nothing -> H.modify_ \s -> s { editPos = Nothing }
-      Nothing -> pure unit
+    mCoord <- liftEffect $ mouseCoord e
+    case mCoord of
+      Just coord -> do
+        state <- H.get
+        let
+          editPos = Just (Tuple coord (stoneSelectorToColor state.editColor))
+        case editPos /= state.editPos of
+          true -> do
+            H.modify_ \s -> s { editPos = editPos }
+            drawCanvases
+          false -> pure unit
+      Nothing -> H.modify_ \s -> s { editPos = Nothing }
   AddStone e -> do
     pos' <- liftEffect $ relativePosition e
     state <- H.get

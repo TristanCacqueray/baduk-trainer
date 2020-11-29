@@ -1,6 +1,7 @@
 module Main (main) where
 
 import Prelude
+import SGF as SGF
 import Data.Array (intercalate)
 import Data.List (List(..), mapWithIndex, toUnfoldable)
 import Data.Maybe (Maybe(..))
@@ -107,6 +108,7 @@ handleAction = case _ of
     H.modify_ \s -> s { trainingGames = newGames, mode = ShowGames }
   Played idx maybeResult -> do
     liftEffect $ log ("Played " <> show idx <> " : " <> show maybeResult)
+    H.modify_ \s -> s { mode = ShowGames }
 
 -- Render
 render :: forall m. MonadEffect m => State -> H.ComponentHTML Action Slots m
@@ -129,7 +131,9 @@ render state =
   body = case state.mode of
     ShowGames -> [ HH.h1_ [ HH.text "Select a training game" ] ] <> (toUnfoldable $ mapWithIndex renderGamePicker state.trainingGames)
     EditGame n s -> [ HH.slot editor unit Editor.component s (Just <<< Edited n) ]
-    PlayGame n s -> [ HH.slot player unit Player.component s (Just <<< Played n) ]
+    PlayGame n s -> case SGF.loadBaduk s of
+      Just g -> [ HH.slot player unit Player.component g (Just <<< Played n) ]
+      Nothing -> [ HH.text ("Invalid game: " <> s) ]
 
   clk mode = HE.onClick \e -> Just (SwitchMode mode)
 
