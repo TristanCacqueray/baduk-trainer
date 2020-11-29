@@ -5,9 +5,12 @@ import Baduk as Baduk
 import Baduk.Game as Baduk
 import Baduk.Types (Coord(..))
 import Data.Maybe (Maybe(..))
+import Data.Time.Duration (Milliseconds(..))
 import Data.Tuple (Tuple(..))
 import Editor as Editor
 import Effect (Effect)
+import Effect.Aff (delay)
+import Effect.Aff.Class (class MonadAff)
 import Effect.Class (class MonadEffect)
 import Effect.Console (log)
 import Graphics.Canvas (getCanvasElementById)
@@ -38,7 +41,7 @@ instance showResult :: Show Result where
   show Win = "win"
   show Loss = "loss"
 
-component :: forall query m. MonadEffect m => H.Component HH.HTML query Input Output m
+component :: forall query m. MonadAff m => MonadEffect m => H.Component HH.HTML query Input Output m
 component =
   H.mkComponent
     { initialState
@@ -120,7 +123,7 @@ render state =
 aiPlay :: Baduk.Game -> Effect Baduk.Game
 aiPlay g = pure g
 
-handleAction :: forall m. MonadEffect m => Action -> H.HalogenM State Action () Output m Unit
+handleAction :: forall m. MonadAff m => Action -> H.HalogenM State Action () Output m Unit
 handleAction = case _ of
   Resign -> H.raise (Just Loss)
   Restart -> do
@@ -149,8 +152,12 @@ handleAction = case _ of
         let
           newGame = Baduk.setStone state.game coord Black
         H.modify_ \s -> s { game = newGame, status = WaitingAI }
-        game <- liftEffect $ aiPlay newGame
-        H.modify_ \s -> s { game = newGame, status = WaitingHuman }
+        _ <-
+          H.fork do
+            H.liftAff (delay $ Milliseconds 1000.0)
+            game <- liftEffect $ aiPlay newGame
+            H.modify_ \s -> s { game = newGame, status = WaitingHuman }
+        pure unit
   MouseLeave -> do
     H.modify_ \s -> s { editCoord = Nothing }
     drawBoard

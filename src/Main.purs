@@ -1,14 +1,13 @@
 module Main (main) where
 
 import Prelude
-import SGF as SGF
 import Data.Array (intercalate)
 import Data.List (List(..), mapWithIndex, toUnfoldable)
 import Data.Maybe (Maybe(..))
 import Data.Symbol (SProxy(..))
 import Editor as Editor
-import Player as Player
 import Effect (Effect)
+import Effect.Aff.Class (class MonadAff)
 import Effect.Class (class MonadEffect)
 import Effect.Console (log)
 import Halogen (liftEffect)
@@ -19,6 +18,8 @@ import Halogen.HTML.Core (ClassName(..))
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Halogen.VDom.Driver (runUI)
+import Player as Player
+import SGF as SGF
 
 type Slots
   = ( editor :: Editor.Slot Unit
@@ -77,7 +78,7 @@ homeNavClass m = case isHome m of
 type State
   = { trainingGames :: List String, mode :: Mode }
 
-badukTrainer :: forall query output m. MonadEffect m => H.Component HH.HTML query Input output m
+badukTrainer :: forall query output m. MonadAff m => MonadEffect m => H.Component HH.HTML query Input output m
 badukTrainer =
   H.mkComponent
     { initialState
@@ -111,7 +112,7 @@ handleAction = case _ of
     H.modify_ \s -> s { mode = ShowGames }
 
 -- Render
-render :: forall m. MonadEffect m => State -> H.ComponentHTML Action Slots m
+render :: forall m. MonadAff m => MonadEffect m => State -> H.ComponentHTML Action Slots m
 render state =
   HH.div
     [ HP.class_ (ClassName "container") ]
