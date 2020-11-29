@@ -32,6 +32,9 @@ type Input
 type Output
   = Maybe String
 
+type Slot id
+  = forall query. H.Slot query Output id
+
 component :: forall query m. MonadEffect m => H.Component HH.HTML query Input Output m
 component =
   H.mkComponent

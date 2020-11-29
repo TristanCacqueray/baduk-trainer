@@ -6,6 +6,7 @@ import Data.List (List(..), mapWithIndex, toUnfoldable)
 import Data.Maybe (Maybe(..))
 import Data.Symbol (SProxy(..))
 import Editor as Editor
+import Player as Player
 import Effect (Effect)
 import Effect.Class (class MonadEffect)
 import Effect.Console (log)
@@ -19,9 +20,13 @@ import Halogen.HTML.Properties as HP
 import Halogen.VDom.Driver (runUI)
 
 type Slots
-  = ( editor :: forall query. H.Slot query Editor.Output Int )
+  = ( editor :: Editor.Slot Unit
+    , player :: Player.Slot Unit
+    )
 
 editor = SProxy :: SProxy "editor"
+
+player = SProxy :: SProxy "player"
 
 defaultGames :: List String
 defaultGames =
@@ -56,6 +61,7 @@ data Mode
 data Action
   = SwitchMode Mode
   | Edited Int (Maybe String)
+  | Played Int (Maybe Player.Result)
 
 isHome :: Mode -> Boolean
 isHome = case _ of
@@ -99,6 +105,8 @@ handleAction = case _ of
         Just g -> replaceGame idx g state.trainingGames
         Nothing -> state.trainingGames
     H.modify_ \s -> s { trainingGames = newGames, mode = ShowGames }
+  Played idx maybeResult -> do
+    liftEffect $ log ("Played " <> show idx <> " : " <> show maybeResult)
 
 -- Render
 render :: forall m. MonadEffect m => State -> H.ComponentHTML Action Slots m
@@ -120,8 +128,8 @@ render state =
 
   body = case state.mode of
     ShowGames -> [ HH.h1_ [ HH.text "Select a training game" ] ] <> (toUnfoldable $ mapWithIndex renderGamePicker state.trainingGames)
-    EditGame n s -> [ HH.slot editor 0 Editor.component s (Just <<< Edited n) ]
-    PlayGame n s -> [ HH.text "playing game" ]
+    EditGame n s -> [ HH.slot editor unit Editor.component s (Just <<< Edited n) ]
+    PlayGame n s -> [ HH.slot player unit Player.component s (Just <<< Played n) ]
 
   clk mode = HE.onClick \e -> Just (SwitchMode mode)
 
