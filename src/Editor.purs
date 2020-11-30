@@ -256,7 +256,7 @@ renderSGFEditor state = do
         , HH.div
             [ HP.class_ (ClassName "col") ]
             [ mkBoard
-            , renderMignature (show boardSize' <> "px") (Baduk.save state.game Nothing)
+            , renderMignature (show boardSize' <> "px") (Baduk.save state.game)
             , HH.div_
                 [ HH.a
                     [ HP.class_ (ClassName "btn btn-primary"), HE.onClick \s -> Just $ Save ]
@@ -290,10 +290,10 @@ handleSGFEditorAction :: forall m. MonadEffect m => Action -> H.HalogenM State A
 handleSGFEditorAction = case _ of
   Initialize -> drawCanvases
   SelectBlackStone -> do
-    H.modify_ \s -> s { editColor = AddBlackStone }
+    H.modify_ \s -> s { editColor = AddBlackStone, game = s.game { startingPlayer = Black } }
     drawCanvases
   SelectWhiteStone -> do
-    H.modify_ \s -> s { editColor = AddWhiteStone }
+    H.modify_ \s -> s { editColor = AddWhiteStone, game = s.game { startingPlayer = White } }
     drawCanvases
   SelectClearStone -> do
     H.modify_ \s -> s { editColor = RemoveStone }
@@ -303,7 +303,7 @@ handleSGFEditorAction = case _ of
     drawCanvases
   Save -> do
     state <- H.get
-    H.raise $ Just (Baduk.save state.game Nothing)
+    H.raise $ Just (Baduk.save state.game)
   Cancel -> H.raise Nothing
   MouseMove e -> do
     mCoord <- liftEffect $ mouseCoord e

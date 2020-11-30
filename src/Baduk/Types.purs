@@ -1,11 +1,9 @@
 module Baduk.Types where
 
-import SGF.Types (Color(..))
-import Data.Array
-import Data.Maybe (Maybe(..))
 import Data.Eq (class Eq)
 import Data.List (List(Nil))
 import Prelude (class Show, show, (<>))
+import SGF.Types (Color(..))
 
 data Coord
   = Coord Int Int
@@ -29,22 +27,16 @@ type Player
 
 type Game
   = { size :: Int
-    , next :: Maybe Color
-    , move :: Maybe Coord
+    , startingPlayer :: Color
     , black :: Player
     , white :: Player
-    , board :: Array Position
     }
 
 showGame :: Game -> String
-showGame { size: size, board: board } = go board
-  where
-  go [] = ""
-
-  go xs = show (take size xs) <> "\n" <> go (drop size xs)
+showGame game = "<Baduk size=" <> show game.size <> " />"
 
 initPlayer :: Player
 initPlayer = { stones: Nil }
 
 initGame :: Game
-initGame = { size: 19, next: Nothing, move: Nothing, black: initPlayer, white: initPlayer, board: [] }
+initGame = { size: 19, startingPlayer: Black, black: initPlayer, white: initPlayer }

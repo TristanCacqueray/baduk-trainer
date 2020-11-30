@@ -7,6 +7,7 @@ import Data.Tuple (Tuple(..))
 import Baduk.Types (Game)
 import Baduk.Converter (load)
 import SGF.Parser
+import SGF.Types
 
 mapError :: forall a b ok. (a -> b) -> Either a ok -> Either b ok
 mapError f e = case e of
@@ -17,3 +18,8 @@ loadBaduk :: String -> Maybe Game
 loadBaduk s = case mapError (const "error") (parse s) >>= load of
   Right (Tuple game log) -> Just game
   _ -> Nothing
+
+inverse :: Color -> Color
+inverse = case _ of
+  White -> Black
+  Black -> White

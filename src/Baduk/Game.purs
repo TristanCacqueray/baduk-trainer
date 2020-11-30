@@ -10,7 +10,7 @@ import Data.String.CodeUnits (singleton)
 
 -- TODO: validate move is valid?
 addStone ∷ Coord → Game → Maybe Game
-addStone move@(Coord x y) game = Just (game { move = Just move })
+addStone move@(Coord x y) game = Just game
 
 setPlayerStone :: Player -> Coord -> Player
 setPlayerStone p c = { stones: snoc p.stones c }
@@ -37,15 +37,11 @@ saveCoord (Coord x y) = "[" <> savePos x <> savePos y <> "]"
   savePos :: Int -> String
   savePos p = fromMaybe "" $ singleton <$> fromCharCode (toCharCode 'a' + p)
 
-save :: Game -> Maybe Color -> String
-save g c =
+save :: Game -> String
+save g =
   intercalate "\n"
-    [ "(;SZ[" <> show g.size <> "]" <> startPlayer
-    , ";B" <> foldMap saveCoord g.black.stones
-    , ";W" <> foldMap saveCoord g.white.stones
-    , startPlayer <> ")"
+    [ "(;SZ[" <> show g.size <> "]"
+    , ";AB" <> foldMap saveCoord g.black.stones
+    , ";AW" <> foldMap saveCoord g.white.stones
+    , ";PL[" <> show g.startingPlayer <> "])"
     ]
-  where
-  startPlayer = case c of
-    Just c -> ";PL[" <> show c <> "]"
-    Nothing -> ""

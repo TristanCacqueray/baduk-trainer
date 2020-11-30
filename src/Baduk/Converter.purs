@@ -1,11 +1,11 @@
-module Baduk.Converter (load) where
+module Baduk.Converter (load, showBoard) where
 
-import Baduk.Types (Coord(..), Game, Position(..), initGame)
 import SGF.Types
+import Baduk.Types (Coord(..), Game, Position(..), initGame)
 import Control.Monad.Except (ExceptT, runExceptT, throwError)
 import Control.Monad.State (StateT, execStateT, get, modify)
 import Control.Monad.Writer (WriterT, runWriterT, tell)
-import Data.Array (cons, reverse)
+import Data.Array (cons, reverse, take, drop)
 import Data.Either (Either)
 import Data.Foldable (elem, traverse_)
 import Data.Identity (Identity)
@@ -15,7 +15,7 @@ import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap)
 import Data.Traversable (for)
 import Data.Tuple (Tuple)
-import Prelude (mod, otherwise, show, ($), (*), (*>), (+), (-), (/), (<>))
+import Prelude (identity, mod, otherwise, show, ($), (*), (*>), (+), (-), (/), (<>))
 
 type Error
   = String
@@ -28,7 +28,7 @@ type Loader
 
 loader ∷ FlatSGF → Loader Game
 loader fsgf = case onlyHead fsgf of
-  Just props → traverse_ go props *> modify addBoard
+  Just props → traverse_ go props *> modify identity
   Nothing → throwError "Only single tree game are currently supported"
   where
   onlyHead ∷ ∀ a. List a → Maybe a
@@ -39,7 +39,7 @@ loader fsgf = case onlyHead fsgf of
   go ∷ Property → Loader Game
   go (Prop "SZ" (Num n : Nil)) = modify (\game → game { size = round n })
 
-  go (Prop "PL" (Color col : Nil)) = modify (\game → game { next = Just col })
+  go (Prop "PL" (Color col : Nil)) = modify (\game → game { startingPlayer = col })
 
   go (Prop "AB" vals) = addStones Black vals
 
@@ -79,8 +79,8 @@ idxToCoord sz idx = Coord x y
 
   y = idx / sz
 
-addBoard ∷ Game → Game
-addBoard game@{ size: size, black: bplayer, white: wplayer } = game { board = reverse (create (game.size * game.size)) }
+getBoard ∷ Game → Array Position
+getBoard game@{ size: size, black: bplayer, white: wplayer } = reverse (create (game.size * game.size))
   where
   create ∷ Int → Array Position
   create 0 = []
@@ -91,3 +91,10 @@ addBoard game@{ size: size, black: bplayer, white: wplayer } = game { board = re
     | coord `elem` bplayer.stones = Occupied Black
     | coord `elem` wplayer.stones = Occupied White
     | otherwise = Empty
+
+showBoard :: Game -> String
+showBoard game = go (getBoard game)
+  where
+  go [] = ""
+
+  go xs = show (take game.size xs) <> "\n" <> go (drop game.size xs)

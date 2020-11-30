@@ -129,13 +129,16 @@ render state =
 aiPlay :: GnuGO.WASM -> Baduk.Game -> Effect Baduk.Game
 aiPlay gnugo game = do
   let
-    gameStr = Baduk.save game (Just White)
+    -- ensure gnuGo play oposite color by inversing starting player
+    -- TODO: remove this hack when proper stone history is implemented
+    gameStr = Baduk.save (game { startingPlayer = SGF.inverse game.startingPlayer })
   log ("sending: " <> gameStr)
   let
     newGameStr = GnuGO.play gnugo 0 gameStr
   log ("received: " <> newGameStr)
   case SGF.loadBaduk newGameStr of
-    Just g -> pure g
+    -- revert starting player inversion
+    Just g -> pure (g { startingPlayer = game.startingPlayer })
     Nothing -> do
       log ("Couldn't load")
       pure game
@@ -167,7 +170,7 @@ handleAction = case _ of
       Nothing -> pure unit
       Just coord -> do
         let
-          newGame = Baduk.setStone state.game coord Black
+          newGame = Baduk.setStone state.game coord state.game.startingPlayer
         H.modify_ \s -> s { game = newGame, status = WaitingAI }
         _ <-
           H.fork do
@@ -195,7 +198,7 @@ handleAction = case _ of
         Just boardCanvas -> do
           let
             select = case Tuple state.status state.editCoord of
-              Tuple WaitingHuman (Just coord) -> Just (Tuple coord (Just Black))
+              Tuple WaitingHuman (Just coord) -> Just (Tuple coord (Just state.game.startingPlayer))
               _ -> Nothing
           boardCtx <- Canvas.getContext2D boardCanvas
           Editor.renderBoard boardCtx select state.game

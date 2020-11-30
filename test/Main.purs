@@ -19,7 +19,7 @@ import Prelude (Unit, pure, show, unit, ($), (<>), (==), discard)
 import SGF.Parser (parse)
 import SGF.Types (GameTree, demo)
 import SGF (loadBaduk)
-import Baduk.Types (showGame)
+import Baduk.Converter (showBoard)
 import Test.Spec (describe, it)
 import Test.Spec.Reporter.Console (consoleReporter)
 import Test.Spec.Runner (runSpec)
@@ -94,10 +94,10 @@ main =
   checkShowGame :: forall m. MonadThrow Error m => m Unit
   checkShowGame = case loadBaduk sgfStr of
     Just g ->
-      if showGame g == gameStr then
+      if showBoard g == gameStr then
         pure unit
       else
-        throwError (error $ showGame g)
+        throwError (error $ showBoard g)
     Nothing -> throwError (error "Couldn't load game")
 
   parserTests =
