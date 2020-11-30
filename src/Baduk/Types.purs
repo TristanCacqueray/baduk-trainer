@@ -23,7 +23,7 @@ instance showPos :: Show Position where
 derive instance eqCoord :: Eq Coord
 
 type Player
-  = { stones :: List Coord }
+  = { stones :: List Coord, moves :: List Coord }
 
 type Game
   = { size :: Int
@@ -36,7 +36,12 @@ showGame :: Game -> String
 showGame game = "<Baduk size=" <> show game.size <> " />"
 
 initPlayer :: Player
-initPlayer = { stones: Nil }
+initPlayer = { stones: Nil, moves: Nil }
+
+getPlayer :: Game -> Color -> Player
+getPlayer game = case _ of
+  Black -> game.black
+  White -> game.white
 
 initGame :: Game
 initGame = { size: 19, startingPlayer: Black, black: initPlayer, white: initPlayer }

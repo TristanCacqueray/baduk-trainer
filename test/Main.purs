@@ -1,14 +1,17 @@
 module Test.Main where
 
-import Data.Maybe (Maybe(..))
 import Baduk.Converter (load)
-import Data.Array (intercalate)
+import Baduk.Converter (showBoard)
+import Baduk.Game as Baduk
+import Baduk.Types (Coord(..), initGame)
 import Control.Monad.Error.Class (class MonadThrow, throwError)
 import Data.Array (concat)
+import Data.Array (intercalate)
 import Data.Array as A
 import Data.Either (Either(..))
 import Data.Functor (map)
-import Data.List (List)
+import Data.List (List(..))
+import Data.Maybe (Maybe(..))
 import Data.String (null)
 import Data.Traversable (sequence_)
 import Data.Tuple (Tuple(..))
@@ -16,10 +19,9 @@ import Effect (Effect)
 import Effect.Aff (launchAff_)
 import Effect.Exception (Error, error)
 import Prelude (Unit, pure, show, unit, ($), (<>), (==), discard)
+import SGF (loadBaduk)
 import SGF.Parser (parse)
 import SGF.Types (GameTree, demo)
-import SGF (loadBaduk)
-import Baduk.Converter (showBoard)
 import Test.Spec (describe, it)
 import Test.Spec.Reporter.Console (consoleReporter)
 import Test.Spec.Runner (runSpec)
@@ -70,6 +72,7 @@ main =
           describe "Converter" do
             it "load demo sgf" (checkLoader demo)
             it "print game" checkShowGame
+            it "save game" checkSaveGame
   where
   sgfStr =
     intercalate "\n"
@@ -90,6 +93,25 @@ main =
       , "[.,.,.,.,.]"
       , ""
       ]
+
+  testGame =
+    initGame
+      { black = initGame.black { moves = Cons (Coord 1 1) (Cons (Coord 1 2) Nil) }
+      , white = initGame.white { moves = Cons (Coord 4 1) (Cons (Coord 4 2) Nil) }
+      }
+
+  testStr =
+    intercalate "\n"
+      [ "(;SZ[19]"
+      , ";PL[B]B[bb];W[eb];B[bc];W[ec])"
+      ]
+
+  checkSaveGame :: forall m. MonadThrow Error m => m Unit
+  checkSaveGame =
+    if Baduk.save testGame == testStr then
+      pure unit
+    else
+      throwError (error $ Baduk.save testGame)
 
   checkShowGame :: forall m. MonadThrow Error m => m Unit
   checkShowGame = case loadBaduk sgfStr of

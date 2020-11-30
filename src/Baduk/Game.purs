@@ -1,22 +1,27 @@
 module Baduk.Game where
 
 import Baduk.Types
+import Baduk.Types
 import Prelude
 import SGF.Types
 import Data.Char (fromCharCode, toCharCode)
-import Data.List (List(..), concatMap, elem, filter, foldMap, intercalate, reverse, snoc)
+import Data.List (List(..), concatMap, elem, filter, foldMap, intercalate, reverse, snoc, zip)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.String.CodeUnits (singleton)
+import Data.Tuple (Tuple(..))
+import SGF (inverse)
 
 -- TODO: validate move is valid?
-addStone ∷ Coord → Game → Maybe Game
-addStone move@(Coord x y) game = Just game
+addStone ∷ Color -> Coord -> Game → Game
+addStone color coord game = case color of
+  Black -> game { black = game.black { moves = snoc game.black.moves coord } }
+  White -> game { white = game.white { moves = snoc game.white.moves coord } }
 
 setPlayerStone :: Player -> Coord -> Player
-setPlayerStone p c = { stones: snoc p.stones c }
+setPlayerStone p c = p { stones = snoc p.stones c }
 
 removePlayerStone :: Player -> Coord -> Player
-removePlayerStone p c = { stones: filter (not <<< eq $ c) p.stones }
+removePlayerStone p c = p { stones = filter (not <<< eq $ c) p.stones }
 
 setStone :: Game -> Coord -> Color -> Game
 setStone g coord color
@@ -40,8 +45,34 @@ saveCoord (Coord x y) = "[" <> savePos x <> savePos y <> "]"
 save :: Game -> String
 save g =
   intercalate "\n"
-    [ "(;SZ[" <> show g.size <> "]"
-    , ";AB" <> foldMap saveCoord g.black.stones
-    , ";AW" <> foldMap saveCoord g.white.stones
-    , ";PL[" <> show g.startingPlayer <> "])"
-    ]
+    ( [ "(;SZ[" <> show g.size <> "]" ]
+        <> addStones "B" g.black.stones
+        <> addStones "W" g.white.stones
+        <> [ ";PL[" <> show g.startingPlayer <> "]" <> stonePlayed <> ")" ]
+    )
+  where
+  addStones _ Nil = []
+
+  addStones c xs = [ ";A" <> c <> foldMap saveCoord xs ]
+
+  stonePlayed :: String
+  stonePlayed =
+    intercalate ";"
+      (map showPlayedPos allStonePlayed)
+
+  showPlayedPos :: Tuple Color Coord -> String
+  showPlayedPos (Tuple color coord) = show color <> saveCoord coord
+
+  allStonePlayed :: List (Tuple Color Coord)
+  allStonePlayed = interleave starting opponent
+
+  interleave :: forall a. List a -> List a -> List a
+  interleave (Cons x xs) o = Cons x (interleave o xs)
+
+  interleave _ _ = Nil
+
+  starting :: List (Tuple Color Coord)
+  starting = map (Tuple g.startingPlayer) (getPlayer g g.startingPlayer).moves
+
+  opponent :: List (Tuple Color Coord)
+  opponent = map (Tuple (inverse g.startingPlayer)) (getPlayer g (inverse g.startingPlayer)).moves
