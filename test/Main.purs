@@ -171,8 +171,8 @@ main =
 
   testStr =
     intercalate "\n"
-      [ "(;SZ[19]"
-      , ";PL[B]B[bb];W[eb];B[bc];W[ec])"
+      [ "(;SZ[19]PL[B]"
+      , ";W[ec](;B[bc](;W[eb](;B[bb]))))"
       ]
 
   checkSaveGame :: forall m. MonadThrow Error m => m Unit

@@ -2,7 +2,7 @@ module Main (main) where
 
 import Prelude
 import Data.Array (intercalate)
-import Data.List (List(..), mapWithIndex, toUnfoldable)
+import Data.List (List(..), (:), mapWithIndex, toUnfoldable)
 import Data.Maybe (Maybe(..))
 import Data.Symbol (SProxy(..))
 import Editor as Editor
@@ -33,18 +33,15 @@ player = SProxy :: SProxy "player"
 
 defaultGames :: List String
 defaultGames =
-  Cons
-    ( intercalate "\n"
-        [ "(;GN[Basic]GM[1]FF[4]"
-        , "SZ[5]"
-        , "DT[2020-11-08]"
-        , "AP[GNU Go:3.9.1]"
-        , ";B[bb]C[load and analyze mode];W[bc]C[load and analyze mode];B[db]"
-        , ";B[bd]W[ee]"
-        , "C[load and analyze mode])"
-        ]
-    )
-    Nil
+  ( intercalate "\n"
+      [ "(;GN[Basic]SZ[6]"
+      , ";AB[bb][db][bd][cc]"
+      , ";AW[bc][ee]"
+      , ";PL[B])"
+      ]
+  )
+    : "(;GN[Medium]SZ[6]PL[B];AB[bb][eb][be];)"
+    : Nil
 
 -- Halogen entrypoint
 mainWasm :: Maybe GnuGO.WASM -> Effect Unit

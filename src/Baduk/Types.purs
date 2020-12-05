@@ -21,6 +21,9 @@ data Capture
 instance showPoint :: Show Coord where
   show (Coord x y) = "(Coord " <> show x <> " " <> show y <> ")"
 
+instance showCapture :: Show Capture where
+  show (Capture p xs) = "(Capture " <> show p <> " " <> show xs <> ")"
+
 instance showPos :: Show Position where
   show Empty = "."
   show (Occupied Black) = "b"

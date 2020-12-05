@@ -86,7 +86,7 @@ renderBoard ctx selection game =
     fillPath ctx $ rect ctx { x: 0.0, y: 0.0, width: boardSize', height: boardSize' }
     -- Grid
     Canvas.beginPath ctx
-    for_ (range 0 game.size) \n -> do
+    for_ (range 0 (game.size - 1)) \n -> do
       Canvas.strokePath ctx
         $ do
             let
@@ -161,7 +161,7 @@ stoneSize :: Number
 stoneSize = 50.0
 
 boardSize :: Int -> Int
-boardSize size = round boardPadding * 2 + round stoneSize * size
+boardSize size = round boardPadding * 2 + round stoneSize * (size - 1)
 
 -- Get the element relative poition of a click event
 relativePosition :: MouseEvent -> Effect (Maybe { x :: Int, y :: Int })

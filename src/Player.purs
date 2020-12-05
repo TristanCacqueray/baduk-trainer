@@ -3,8 +3,9 @@ module Player where
 import Prelude
 import Baduk (Game) as Baduk
 import Baduk.Game (save, setStone) as Baduk
+import Baduk.Game as Baduk
 import Baduk.Game as Badul
-import Baduk.Types (Coord)
+import Baduk.Types (Coord, Stone(..))
 import Data.List (List(..), length)
 import Data.Maybe (Maybe(..))
 import Data.Time.Duration (Milliseconds(..))
@@ -148,16 +149,26 @@ render state =
 aiPlay :: GnuGO.WASM -> Baduk.Game -> Effect Baduk.Game
 aiPlay gnugo game = do
   let
-    -- ensure gnuGo play oposite color by inversing starting player
-    -- TODO: remove this hack when proper stone history is implemented
-    gameStr = Baduk.save (game { startingPlayer = SGF.inverse game.startingPlayer })
+    gameStr = Baduk.save game
   log ("sending: " <> gameStr)
   let
     newGameStr = GnuGO.play gnugo 0 gameStr
   log ("received: " <> newGameStr)
   case SGF.loadBaduk newGameStr of
     -- revert starting player inversion
-    Just g -> pure (g { startingPlayer = game.startingPlayer })
+    Just g -> do
+      log ("loaded game: " <> show g)
+      case Baduk.getLastMove g of
+        Just move -> do
+          log ("adding: " <> show move)
+          case Baduk.addStone move game of
+            Just newGame -> pure newGame
+            Nothing -> do
+              log ("No new-move?!")
+              pure game
+        Nothing -> do
+          log ("No move?!")
+          pure game
     Nothing -> do
       log ("Couldn't load")
       pure game
@@ -187,23 +198,30 @@ handleAction = case _ of
     state <- H.get
     case state.editCoord of
       Nothing -> pure unit
-      Just coord -> do
-        let
-          newGame = Baduk.setStone state.game coord state.game.startingPlayer
-        H.modify_ \s -> s { game = newGame, status = WaitingAI }
-        _ <-
-          H.fork do
-            newGame' <- case state.gnugo of
-              Nothing -> do
-                H.liftAff (delay $ Milliseconds 1000.0)
-                -- Fake a move
-                pure newGame
-              Just gnugo -> do
-                g <- H.liftAff $ liftEffect $ aiPlay gnugo newGame
-                pure g
-            H.modify_ \s -> s { game = newGame', status = WaitingHuman }
-            drawBoard
-        pure unit
+      Just coord -> case Badul.addStone (Stone state.game.startingPlayer coord) state.game of
+        Just newGame -> do
+          H.modify_ \s -> s { game = newGame, status = WaitingAI }
+          drawBoard
+          _ <- do
+            H.fork do
+              -- This delay seems to help halogen render the waiting ai message
+              -- Otherwise it skip the update and only show waiting for humang again
+              -- as if wasm is freezing the rendering loop
+              H.liftAff (delay $ Milliseconds 10.0)
+              newGame' <- case state.gnugo of
+                Nothing -> do
+                  H.liftAff (delay $ Milliseconds 1000.0)
+                  -- Fake a move
+                  pure newGame
+                Just gnugo -> do
+                  g <- H.liftAff $ liftEffect $ aiPlay gnugo newGame
+                  pure g
+              H.modify_ \s -> s { game = newGame', status = WaitingHuman }
+              drawBoard
+          pure unit
+        Nothing -> do
+          liftEffect $ log "Invalid move"
+          pure unit
   MouseLeave -> do
     H.modify_ \s -> s { editCoord = Nothing }
     drawBoard
@@ -212,6 +230,7 @@ handleAction = case _ of
   drawBoard = do
     state <- H.get
     liftEffect do
+      -- log ("Drawing: " <> show state.game)
       canvas <- getCanvasElementById "trainer-board"
       case canvas of
         Just boardCanvas -> do

@@ -16,7 +16,7 @@ import Data.Newtype (unwrap)
 import Data.String (CodePoint, codePointFromChar, length, toCodePointArray)
 import Data.Traversable (for)
 import Data.Tuple (Tuple)
-import Prelude (identity, mod, otherwise, pure, show, ($), (*), (*>), (+), (-), (/), (<>), (>>=), (==))
+import Prelude (identity, mod, otherwise, pure, show, ($), (*), (*>), (+), (-), (/), (<>), (==), (>>=), (||))
 
 type Error
   = String
@@ -44,11 +44,11 @@ loader fsgf = case onlyHead fsgf of
 
   go (Prop "PL" (Color col : Nil)) = modify (\game → game { startingPlayer = col })
 
-  go (Prop "AB" vals) = addStones Black vals
+  go (Prop "AB" vals) = setStones Black vals
 
   go (Prop "B" vals) = addStones Black vals
 
-  go (Prop "AW" vals) = addStones White vals
+  go (Prop "AW" vals) = setStones White vals
 
   go (Prop "W" vals) = addStones White vals
 
@@ -59,8 +59,18 @@ loader fsgf = case onlyHead fsgf of
     Just points →
       modify
         ( \game → case color of
-            Black → game { black = game.black { stones = game.black.stones <> points } }
-            White → game { white = game.white { stones = game.white.stones <> points } }
+            Black → game { black = game.black { moves = points <> game.black.moves } }
+            White → game { white = game.white { moves = points <> game.white.moves } }
+        )
+    Nothing → throwError ("Invalid moves value for " <> show color)
+
+  setStones ∷ Color → List Value → Loader Game
+  setStones color vals = case for vals valPoint of
+    Just points →
+      modify
+        ( \game → case color of
+            Black → game { black = game.black { stones = points <> game.black.stones } }
+            White → game { white = game.white { stones = points <> game.white.stones } }
         )
     Nothing → throwError ("Invalid stones value for " <> show color)
 
@@ -107,8 +117,8 @@ getBoard game@{ size: size, black: bplayer, white: wplayer } = reverse (create (
   create n = createCell (idxToCoord size n) `cons` create (n - 1)
 
   createCell coord
-    | coord `elem` bplayer.stones = Occupied Black
-    | coord `elem` wplayer.stones = Occupied White
+    | coord `elem` bplayer.stones || coord `elem` bplayer.moves = Occupied Black
+    | coord `elem` wplayer.stones || coord `elem` wplayer.moves = Occupied White
     | otherwise = Empty
 
 showBoard :: Game -> String
