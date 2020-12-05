@@ -23,11 +23,22 @@ instance showPos :: Show Position where
   show (Occupied Black) = "b"
   show (Occupied White) = "w"
 
+showC :: Color -> String
+showC = case _ of
+  Black -> "Black"
+  White -> "White"
+
+instance showStone :: Show Stone where
+  show (Stone color coord) = "(Stone " <> showC color <> " " <> show coord <> ")"
+
 derive instance eqCoord :: Eq Coord
+
+derive instance eqStone :: Eq Stone
 
 type Player
   = { stones :: List Coord, moves :: List Coord }
 
+-- derive instance eqPlayer :: Eq Player
 type Game
   = { size :: Int
     , startingPlayer :: Color
@@ -37,8 +48,9 @@ type Game
     , stonesAlive :: List Stone
     }
 
+-- derive instance eqGame :: Eq Game
 showGame :: Game -> String
-showGame game = "<Baduk size=" <> show game.size <> " />"
+showGame game = "<Baduk size=" <> show game.size <> " stones=" <> show game.stonesAlive <> " />"
 
 initPlayer :: Player
 initPlayer = { stones: Nil, moves: Nil }

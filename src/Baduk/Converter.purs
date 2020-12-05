@@ -1,21 +1,22 @@
-module Baduk.Converter (load, showBoard) where
+module Baduk.Converter (load, showBoard, readBoard) where
 
 import SGF.Types
-import Baduk.Types (Coord(..), Game, Position(..), initGame)
+import Baduk.Types (Coord(..), Game, Position(..), Stone(..), initGame)
 import Control.Monad.Except (ExceptT, runExceptT, throwError)
 import Control.Monad.State (StateT, execStateT, get, modify)
 import Control.Monad.Writer (WriterT, runWriterT, tell)
-import Data.Array (cons, reverse, take, drop)
+import Data.Array (cons, drop, mapWithIndex, reverse, take)
 import Data.Either (Either)
 import Data.Foldable (elem, traverse_)
 import Data.Identity (Identity)
 import Data.Int (round)
-import Data.List (List(..), uncons, (:))
+import Data.List (List(..), catMaybes, fromFoldable, head, uncons, (:))
 import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap)
+import Data.String (CodePoint, codePointFromChar, length, toCodePointArray)
 import Data.Traversable (for)
 import Data.Tuple (Tuple)
-import Prelude (identity, mod, otherwise, show, ($), (*), (*>), (+), (-), (/), (<>))
+import Prelude (identity, mod, otherwise, pure, show, ($), (*), (*>), (+), (-), (/), (<>), (>>=), (==))
 
 type Error
   = String
@@ -78,6 +79,22 @@ idxToCoord sz idx = Coord x y
   x = mod idx sz
 
   y = idx / sz
+
+readBoard :: List String -> Maybe Game
+readBoard xs = getSize >>= \s -> pure (initGame { size = s, stonesAlive = go 0 xs })
+  where
+  getSize = head xs >>= \x -> pure $ length x
+
+  go :: Int -> List String -> List Stone
+  go _ Nil = Nil
+
+  go pos (Cons x rest) = (catMaybes $ fromFoldable $ mapWithIndex (goRow pos) (toCodePointArray x)) <> (go (pos + 1) rest)
+
+  goRow :: Int -> Int -> CodePoint -> Maybe Stone
+  goRow x y cp
+    | cp == codePointFromChar 'b' = pure $ Stone Black (Coord x y)
+    | cp == codePointFromChar 'w' = pure $ Stone White (Coord x y)
+    | otherwise = Nothing
 
 getBoard ∷ Game → Array Position
 getBoard game@{ size: size, black: bplayer, white: wplayer } = reverse (create (game.size * game.size))

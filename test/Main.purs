@@ -1,14 +1,15 @@
 module Test.Main where
 
-import Baduk.Converter (load, showBoard)
+import Baduk.Converter (load, showBoard, readBoard)
+import Baduk.Game (addStone)
 import Baduk.Game as Baduk
-import Baduk.Types (Coord(..), initGame)
+import Baduk.Types (Coord(..), Stone(..), initGame, showGame)
 import Control.Monad.Error.Class (class MonadThrow, throwError)
 import Data.Array (concat, intercalate)
 import Data.Array as A
 import Data.Either (Either(..))
 import Data.Functor (map)
-import Data.List (List(..))
+import Data.List (List(..), fromFoldable)
 import Data.Maybe (Maybe(..))
 import Data.String (null)
 import Data.Traversable (sequence_)
@@ -16,10 +17,10 @@ import Data.Tuple (Tuple(..))
 import Effect (Effect)
 import Effect.Aff (launchAff_)
 import Effect.Exception (Error, error)
-import Prelude (Unit, pure, show, unit, ($), (<>), (==), discard)
+import Prelude (Unit, discard, pure, show, unit, ($), (<>), (==), (/=), bind)
 import SGF (loadBaduk)
 import SGF.Parser (parse)
-import SGF.Types (GameTree, demo)
+import SGF.Types (Color(..), GameTree, demo)
 import Test.Spec (describe, it)
 import Test.Spec.Reporter.Console (consoleReporter)
 import Test.Spec.Runner (runSpec)
@@ -71,7 +72,47 @@ main =
             it "load demo sgf" (checkLoader demo)
             it "print game" checkShowGame
             it "save game" checkSaveGame
+          describe "Game" $ sequence_ playTests
   where
+  playTests =
+    map (\t -> (it t.name $ checkPlayGame t))
+      ( fromFoldable
+          [ { name: "simple capture"
+            , start:
+                fromFoldable
+                  [ "     "
+                  , " bwb "
+                  , "  b  "
+                  ]
+            , move: (Stone Black (Coord 0 2))
+            , want:
+                fromFoldable
+                  [ "  b  "
+                  , " b b "
+                  , "  b  "
+                  ]
+            }
+          ]
+      )
+
+  play start move want = do
+    startingGame <- readBoard start
+    newGame <- addStone move startingGame
+    expectedGame <- readBoard want
+    pure { got: newGame, expected: expectedGame }
+
+  checkPlayGame ::
+    forall m.
+    MonadThrow Error m =>
+    { name :: String, start :: List String, move :: Stone, want :: List String } -> m Unit
+  checkPlayGame { start, move, want } = case play start move want of
+    Just { got, expected } ->
+      if got.stonesAlive /= expected.stonesAlive then
+        throwError (error ("Wanted: " <> showGame expected <> "\n  Got:    " <> showGame got))
+      else
+        pure unit
+    Nothing -> throwError (error "Can't play")
+
   sgfStr =
     intercalate "\n"
       [ "(;GM[1]FF[4]"
