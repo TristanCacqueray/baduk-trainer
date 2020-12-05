@@ -5,6 +5,7 @@ import Baduk (Game) as Baduk
 import Baduk.Game (save, setStone) as Baduk
 import Baduk.Game as Badul
 import Baduk.Types (Coord)
+import Data.List (List(..), length)
 import Data.Maybe (Maybe(..))
 import Data.Time.Duration (Milliseconds(..))
 import Data.Tuple (Tuple(..))
@@ -102,16 +103,34 @@ render state =
         , HE.onMouseMove \e -> Just $ MouseMove e
         , HE.onMouseLeave \e -> Just MouseLeave
         ]
+
+    item txt =
+      HH.span_
+        [ HH.text txt ]
+
+    showCapture name player = case player.captures of
+      Nil -> []
+      captures -> [ item (name <> " captures: " <> (show $ length captures)) ]
+
+    infos =
+      HH.div_
+        ( [ item ("Move: " <> show state.game.move) ]
+            <> showCapture "Black" state.game.black
+            <> showCapture "White" state.game.white
+        )
   in
     HH.div
       [ HP.class_ (ClassName "container") ]
       [ HH.h1_
           [ HH.text "Baduk Trainer" ]
+      , HH.h4_
+          [ HH.text ("Playing: " <> state.game.name) ]
       , HH.p_
           [ HH.text ("Status: " <> message) ]
       , HH.div
           [ HP.class_ (ClassName "col") ]
-          [ board
+          [ HH.div_
+              [ board, infos ]
           , HH.div_
               [ HH.a
                   [ HP.class_ (ClassName "btn btn-primary"), HE.onClick \s -> Just $ Pass ]

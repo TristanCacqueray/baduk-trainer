@@ -6,6 +6,7 @@ import Data.Char (fromCharCode, toCharCode)
 import Data.Foldable (find)
 import Data.List (List(..), elem, filter, foldMap, intercalate, nub, snoc, (:))
 import Data.Maybe (Maybe(..), fromMaybe)
+import Data.String (null)
 import Data.String.CodeUnits (singleton)
 import Data.Tuple (Tuple(..))
 import Prelude (eq, flip, map, not, otherwise, show, ($), (&&), (+), (-), (<), (<$>), (<<<), (<>), (/=), (==), (>=), (||))
@@ -151,12 +152,14 @@ saveCoord (Coord x y) = "[" <> savePos x <> savePos y <> "]"
 save :: Game -> String
 save g =
   intercalate "\n"
-    ( [ "(;SZ[" <> show g.size <> "]" ]
+    ( [ "(;" <> gameName <> "SZ[" <> show g.size <> "]" ]
         <> addStones "B" g.black.stones
         <> addStones "W" g.white.stones
         <> [ ";PL[" <> show g.startingPlayer <> "]" <> stonePlayed <> ")" ]
     )
   where
+  gameName = if null g.name && g.name /= "Unknown" then "" else ("GN[" <> g.name <> "]")
+
   addStones _ Nil = []
 
   addStones c xs = [ ";A" <> c <> foldMap saveCoord xs ]

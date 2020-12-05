@@ -35,7 +35,7 @@ defaultGames :: List String
 defaultGames =
   Cons
     ( intercalate "\n"
-        [ "(;GM[1]FF[4]"
+        [ "(;GN[Basic]GM[1]FF[4]"
         , "SZ[5]"
         , "DT[2020-11-08]"
         , "AP[GNU Go:3.9.1]"
@@ -153,21 +153,26 @@ render state =
 
   clk mode = HE.onClick \e -> Just (SwitchMode mode)
 
-  renderGamePicker idx gameStr =
-    HH.div
-      [ HP.class_ (ClassName "card") ]
-      [ HH.div
-          [ HP.class_ (ClassName "card-body") ]
-          [ Editor.renderMignature "auto" gameStr
-          , HH.a
-              [ HP.class_ (ClassName "btn btn-primary")
-              , clk (PlayGame idx gameStr)
-              ]
-              [ HH.text "play" ]
-          , HH.a
-              [ HP.class_ (ClassName "btn btn-secondary")
-              , clk (EditGame idx gameStr)
-              ]
-              [ HH.text "edit" ]
-          ]
-      ]
+  renderGamePicker idx gameStr = case SGF.loadBaduk gameStr of
+    Just game ->
+      HH.div
+        [ HP.class_ (ClassName "card") ]
+        [ HH.div
+            [ HP.class_ (ClassName "card-body") ]
+            [ HH.h5
+                [ HP.class_ (ClassName "card-title") ]
+                [ HH.text game.name ]
+            , Editor.renderMignature "auto" gameStr
+            , HH.a
+                [ HP.class_ (ClassName "btn btn-primary")
+                , clk (PlayGame idx gameStr)
+                ]
+                [ HH.text "play" ]
+            , HH.a
+                [ HP.class_ (ClassName "btn btn-secondary")
+                , clk (EditGame idx gameStr)
+                ]
+                [ HH.text "edit" ]
+            ]
+        ]
+    Nothing -> HH.div_ [ HH.text "Unknown game.." ]

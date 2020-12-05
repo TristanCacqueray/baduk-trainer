@@ -38,6 +38,8 @@ loader fsgf = case onlyHead fsgf of
     _ → Nothing
 
   go ∷ Property → Loader Game
+  go (Prop "GN" (Text s : Nil)) = modify (\game -> game { name = s })
+
   go (Prop "SZ" (Num n : Nil)) = modify (\game → game { size = round n })
 
   go (Prop "PL" (Color col : Nil)) = modify (\game → game { startingPlayer = col })

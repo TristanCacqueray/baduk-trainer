@@ -261,6 +261,13 @@ renderSGFEditor state = do
             [ mkBoard
             , renderMignature (show boardSize' <> "px") (Baduk.save state.game)
             , HH.div_
+                [ HH.text "Name: "
+                , HH.input
+                    [ HP.value state.game.name
+                    , HE.onValueInput (Just <<< ChangeName)
+                    ]
+                ]
+            , HH.div_
                 [ HH.a
                     [ HP.class_ (ClassName "btn btn-primary"), HE.onClick \s -> Just $ Save ]
                     [ HH.text "Save" ]
@@ -280,6 +287,7 @@ data Action
   | SelectClearStone
   | AddStone MouseEvent
   | MouseMove MouseEvent
+  | ChangeName String
   | ClearSelection
   | Save
   | Cancel
@@ -304,6 +312,8 @@ handleSGFEditorAction = case _ of
   ClearSelection -> do
     H.modify_ \s -> s { editPos = Nothing }
     drawCanvases
+  ChangeName name -> do
+    H.modify_ \s -> s { game = s.game { name = name } }
   Save -> do
     state <- H.get
     H.raise $ Just (Baduk.save state.game)

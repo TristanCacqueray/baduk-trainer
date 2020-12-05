@@ -47,7 +47,8 @@ type Player
 
 -- derive instance eqPlayer :: Eq Player
 type Game
-  = { size :: Int
+  = { name :: String
+    , size :: Int
     , startingPlayer :: Color
     , black :: Player
     , white :: Player
@@ -69,7 +70,8 @@ getPlayer game = case _ of
 
 initGame :: Game
 initGame =
-  { size: 19
+  { name: ""
+  , size: 19
   , startingPlayer: Black
   , black: initPlayer
   , white: initPlayer
