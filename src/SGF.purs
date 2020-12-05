@@ -6,7 +6,7 @@ import Data.Either (Either(..))
 import Data.Tuple (Tuple(..))
 import Baduk.Types (Game)
 import Baduk.Converter (load)
-import SGF.Parser
+import SGF.Parser (parse)
 import SGF.Types
 
 mapError :: forall a b ok. (a -> b) -> Either a ok -> Either b ok

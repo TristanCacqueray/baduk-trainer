@@ -133,12 +133,19 @@ render state =
         [ HH.a [ HP.class_ (ClassName "navbar-brand") ] [ HH.text "pure-gnugo" ]
         , HH.div
             [ HP.class_ (ClassName "navbar-nav") ]
-            [ HH.a [ HP.class_ (ClassName ("nav-link" <> homeNavClass state.mode)), clk ShowGames, HP.href "#" ] [ HH.text "Home" ] ]
+            [ HH.a
+                [ HP.class_ (ClassName ("nav-link" <> homeNavClass state.mode)), clk ShowGames, HP.href "#" ]
+                [ HH.text "Home" ]
+            ]
         ]
     ]
 
   body = case state.mode of
-    ShowGames -> [ HH.h1_ [ HH.text "Select a training game" ] ] <> (toUnfoldable $ mapWithIndex renderGamePicker state.trainingGames)
+    ShowGames ->
+      [ HH.h1_
+          [ HH.text "Select a training game" ]
+      ]
+        <> (toUnfoldable $ mapWithIndex renderGamePicker state.trainingGames)
     EditGame n s -> [ HH.slot editor unit Editor.component s (Just <<< Edited n) ]
     PlayGame n s -> case SGF.loadBaduk s of
       Just g -> [ HH.slot player unit Player.component { game: g, gnugo: state.gnugo } (Just <<< Played n) ]

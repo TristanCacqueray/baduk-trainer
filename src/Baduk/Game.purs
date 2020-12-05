@@ -1,15 +1,22 @@
 module Baduk.Game where
 
-import Baduk.Types
-import Baduk.Types
-import Prelude
 import SGF.Types
+import Baduk.Types (Coord(..), Game, Player, Stone(..), getPlayer)
 import Data.Char (fromCharCode, toCharCode)
-import Data.List (List(..), concatMap, elem, filter, foldMap, intercalate, reverse, snoc, zip)
-import Data.Maybe (Maybe(..), fromMaybe)
+import Data.List (List(..), elem, filter, foldMap, intercalate, snoc)
+import Data.Maybe (fromMaybe)
 import Data.String.CodeUnits (singleton)
 import Data.Tuple (Tuple(..))
+import Prelude (eq, map, not, otherwise, show, ($), (+), (<$>), (<<<), (<>), (||))
 import SGF (inverse)
+
+-- | Initial board when the game start
+setAliveStones :: Game -> Game
+setAliveStones game = game { stonesAlive = blackStones <> whiteStones }
+  where
+  blackStones = map (Stone Black) game.black.stones
+
+  whiteStones = map (Stone White) game.white.stones
 
 -- TODO: validate move is valid?
 addStone ∷ Color -> Coord -> Game → Game

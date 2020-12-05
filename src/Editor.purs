@@ -2,13 +2,13 @@ module Editor where
 
 import Prelude
 import Baduk.Game as Baduk
-import Baduk.Types (Coord(..), Game, initGame)
+import Baduk.Types (Coord(..), Game, Stone(..), initGame)
 import Data.Int (round, toNumber)
-import Data.List (range)
+import Data.List (List(..), range)
 import Data.Maybe (Maybe(..))
 import Data.Ord (abs)
 import Data.Traversable (for_, sequence, traverse)
-import Data.Tuple (Tuple(..))
+import Data.Tuple (Tuple(..), uncurry)
 import Effect (Effect)
 import Effect.Class (class MonadEffect, liftEffect)
 import Effect.Console (logShow)
@@ -101,8 +101,11 @@ renderBoard ctx selection game =
     -- Selection
     for_ selection (\(Tuple coord color) -> for_ color (flip renderStone coord))
     -- Stone
-    for_ (game.black.stones) (renderStone Black)
-    for_ (game.white.stones) (renderStone White)
+    case game.stonesAlive of
+      Nil -> do
+        for_ (game.black.stones) (renderStone Black)
+        for_ (game.white.stones) (renderStone White)
+      xs -> for_ xs (\(Stone color coord) -> renderStone color coord)
     -- Removal
     for_ selection renderClear
   where

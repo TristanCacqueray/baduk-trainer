@@ -1,17 +1,18 @@
 module Player where
 
 import Prelude
-import Baduk as Baduk
-import Baduk.Game as Baduk
-import Baduk.Types (Coord(..))
+import Baduk (Game) as Baduk
+import Baduk.Game (save, setStone) as Baduk
+import Baduk.Game as Badul
+import Baduk.Types (Coord)
 import Data.Maybe (Maybe(..))
 import Data.Time.Duration (Milliseconds(..))
 import Data.Tuple (Tuple(..))
 import Editor as Editor
 import Effect (Effect)
-import Effect.Aff (Aff, delay)
+import Effect.Aff (delay)
 import Effect.Aff.Class (class MonadAff)
-import Effect.Class (class MonadEffect, liftEffect)
+import Effect.Class (class MonadEffect)
 import Effect.Console (log)
 import GnuGO as GnuGO
 import Graphics.Canvas (getCanvasElementById)
@@ -23,7 +24,6 @@ import Halogen.HTML.Core (PropName(..), ClassName(..))
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import SGF as SGF
-import SGF.Types (Color(..))
 import Web.UIEvent.MouseEvent (MouseEvent)
 
 type Input
@@ -69,7 +69,7 @@ initialState :: Input -> State
 initialState input =
   { initialGame: input.game
   , gnugo: input.gnugo
-  , game: input.game
+  , game: Badul.setAliveStones input.game
   , editCoord: Nothing
   , status: WaitingHuman
   }

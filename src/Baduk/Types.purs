@@ -12,6 +12,9 @@ data Position
   = Empty
   | Occupied Color
 
+data Stone
+  = Stone Color Coord
+
 instance showPoint :: Show Coord where
   show (Coord x y) = "(Coord " <> show x <> " " <> show y <> ")"
 
@@ -30,6 +33,8 @@ type Game
     , startingPlayer :: Color
     , black :: Player
     , white :: Player
+    , move :: Int
+    , stonesAlive :: List Stone
     }
 
 showGame :: Game -> String
@@ -44,4 +49,11 @@ getPlayer game = case _ of
   White -> game.white
 
 initGame :: Game
-initGame = { size: 19, startingPlayer: Black, black: initPlayer, white: initPlayer }
+initGame =
+  { size: 19
+  , startingPlayer: Black
+  , black: initPlayer
+  , white: initPlayer
+  , move: 0
+  , stonesAlive: Nil
+  }

@@ -1,12 +1,10 @@
 module Test.Main where
 
-import Baduk.Converter (load)
-import Baduk.Converter (showBoard)
+import Baduk.Converter (load, showBoard)
 import Baduk.Game as Baduk
 import Baduk.Types (Coord(..), initGame)
 import Control.Monad.Error.Class (class MonadThrow, throwError)
-import Data.Array (concat)
-import Data.Array (intercalate)
+import Data.Array (concat, intercalate)
 import Data.Array as A
 import Data.Either (Either(..))
 import Data.Functor (map)
