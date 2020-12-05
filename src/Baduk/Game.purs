@@ -1,7 +1,7 @@
 module Baduk.Game where
 
 import SGF.Types
-import Baduk.Types (Coord(..), Game, Player, Stone(..), getPlayer)
+import Baduk.Types (Capture(..), Coord(..), Game, Player, Stone(..), getPlayer)
 import Data.Char (fromCharCode, toCharCode)
 import Data.Foldable (find)
 import Data.List (List(..), elem, filter, foldMap, intercalate, nub, snoc, (:))
@@ -113,9 +113,15 @@ addStone stone@(Stone color coord) game =
   where
   newGame = game { stonesAlive = removeDeadStones game.size (stone : game.stonesAlive) coord }
 
+  captures :: List Coord
+  captures = map getCoord $ filter (not <<< flip elem newGame.stonesAlive) game.stonesAlive
+
+  updatePlayer :: Player -> Player
+  updatePlayer p = p { moves = snoc p.moves coord, captures = (Capture game.move captures) : p.captures }
+
   doAddStone g = case stone of
-    Stone Black _ -> g { black = g.black { moves = snoc g.black.moves coord } }
-    Stone White _ -> g { white = g.white { moves = snoc g.white.moves coord } }
+    Stone Black _ -> g { black = updatePlayer g.black }
+    Stone White _ -> g { white = updatePlayer g.white }
 
 setPlayerStone :: Player -> Coord -> Player
 setPlayerStone p c = p { stones = snoc p.stones c }

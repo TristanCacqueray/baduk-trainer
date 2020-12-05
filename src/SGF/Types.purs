@@ -1,10 +1,10 @@
 module SGF.Types where
 
+import Data.Eq
 import Control.Semigroupoid ((<<<))
 import Data.List (List(..), concat, concatMap, null, singleton, (:))
 import Data.Monoid ((<>))
-import Prelude (class Show, map, otherwise, show)
-import Data.Eq
+import Prelude (class Ord, class Show, map, otherwise, show)
 
 -- https://www.red-bean.com/sgf/sgf4.html
 type SGF
@@ -56,6 +56,8 @@ instance showColor ∷ Show Color where
   show White = "W"
 
 derive instance eqColor :: Eq Color
+
+derive instance ordColor :: Ord Color
 
 showHexColor :: Color -> String
 showHexColor Black = "#000"

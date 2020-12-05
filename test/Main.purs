@@ -9,7 +9,7 @@ import Data.Array (concat, intercalate)
 import Data.Array as A
 import Data.Either (Either(..))
 import Data.Functor (map)
-import Data.List (List(..), fromFoldable)
+import Data.List (List(..), fromFoldable, sort)
 import Data.Maybe (Maybe(..))
 import Data.String (null)
 import Data.Traversable (sequence_)
@@ -92,6 +92,36 @@ main =
                   , "  b  "
                   ]
             }
+          , { name: "bigger capture"
+            , start:
+                fromFoldable
+                  [ "   b "
+                  , " bwwb"
+                  , "  bb "
+                  ]
+            , move: (Stone Black (Coord 0 2))
+            , want:
+                fromFoldable
+                  [ "  bb "
+                  , " b  b"
+                  , "  bb "
+                  ]
+            }
+          , { name: "multi capture"
+            , start:
+                fromFoldable
+                  [ " b b "
+                  , "bw wb"
+                  , " b b "
+                  ]
+            , move: (Stone Black (Coord 1 2))
+            , want:
+                fromFoldable
+                  [ " b b "
+                  , "b b b"
+                  , " b b "
+                  ]
+            }
           ]
       )
 
@@ -107,7 +137,7 @@ main =
     { name :: String, start :: List String, move :: Stone, want :: List String } -> m Unit
   checkPlayGame { start, move, want } = case play start move want of
     Just { got, expected } ->
-      if got.stonesAlive /= expected.stonesAlive then
+      if sort got.stonesAlive /= sort expected.stonesAlive then
         throwError (error ("Wanted: " <> showGame expected <> "\n  Got:    " <> showGame got))
       else
         pure unit

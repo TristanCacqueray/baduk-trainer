@@ -1,20 +1,20 @@
 module SGF.Parser where
 
-import Data.Maybe (Maybe(..), optional)
 import Control.Alt ((<|>))
 import Control.Lazy (fix)
 import Data.Array as A
 import Data.Char (toCharCode)
 import Data.Either (Either)
 import Data.List (many, some)
+import Data.Maybe (Maybe(..), optional)
 import Data.Number (fromString)
 import Data.String.CodeUnits (fromCharArray)
-import Prelude (bind, pure, (>>=), ($), (<>), (-), (/=), show)
+import Prelude (bind, pure, ($), (-), (/=), (<>), (>>=))
+import SGF.Types (Color(..), GameTree(..), Node, Property(..), SGF, Sequence, Value(..))
 import Text.Parsing.Parser (ParseError, Parser, runParser, fail)
 import Text.Parsing.Parser.Combinators (between, try)
 import Text.Parsing.Parser.String (char, string, satisfy)
 import Text.Parsing.Parser.Token (digit, letter)
-import SGF.Types (Color(..), GameTree(..), Node, Property(..), SGF, Sequence, Value(..))
 
 type P a
   = Parser String a
