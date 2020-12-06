@@ -86,9 +86,15 @@ data Action
 render :: forall m. MonadEffect m => State -> H.ComponentHTML Action () m
 render state =
   let
+    lastMove = getLastMove state.game
+
+    placeInfo = case lastMove of
+      Just (Move _ Pass) -> "click pass (or play another stone)"
+      _ -> "place a stone"
+
     message = case state.status of
       WaitingAI -> "GnuGO is playing"
-      WaitingHuman -> "Your turn to play, place a stone"
+      WaitingHuman -> "Your turn to play, " <> placeInfo
       BadMove -> "Invalid move, play again"
       GameOver score' -> "Game is over: " <> showScore score'
 
@@ -114,6 +120,10 @@ render state =
       Nil -> []
       captures -> [ item (name <> " captures") (length captures) ]
 
+    lastMoveInfo = case lastMove of
+      Just move -> [ HH.br_, item "Last move" move ]
+      Nothing -> []
+
     infos =
       HH.div_
         ( [ item "Move" state.game.move
@@ -121,6 +131,7 @@ render state =
           ]
             <> showCapture "Black" state.game.black
             <> showCapture "White" state.game.white
+            <> lastMoveInfo
         )
 
     mainButton = case state.status of
