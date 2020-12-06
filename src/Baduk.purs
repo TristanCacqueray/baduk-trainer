@@ -3,6 +3,7 @@ module Baduk
   ( module Baduk.Types
   , module Baduk.Converter
   , module Baduk.Game
+  , module SGF
   , loadBaduk
   ) where
 
@@ -13,7 +14,7 @@ import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
 import Data.Tuple (Tuple(..))
 import Prelude (const, (>>=))
-import SGF (parse)
+import SGF (Color(..), parse)
 
 mapError :: forall a b ok. (a -> b) -> Either a ok -> Either b ok
 mapError f e = case e of

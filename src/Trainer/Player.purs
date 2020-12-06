@@ -1,7 +1,7 @@
 module Trainer.Player (Input, Slot, Output, component) where
 
 import Prelude
-import Baduk (Coord, Game, Move(..), Result(..), addMove, getLastMove, initAliveStones, loadBaduk, save)
+import Baduk (Coord, Game, Color(..), Move(..), Result(..), addMove, getLastMove, initAliveStones, isCompleted, loadBaduk, save)
 import Baduk.Types (PlayerMove(..))
 import Data.List (List(..), length)
 import Data.Maybe (Maybe(..))
@@ -43,9 +43,19 @@ component =
     , eval: H.mkEval $ H.defaultEval { handleAction = handleAction, initialize = Just Draw }
     }
 
+data Score
+  = Score Color Number
+
+showScore :: Score -> String
+showScore = case _ of
+  Score Black s -> "Black wins by " <> show s <> " points"
+  Score White s -> "White wins by " <> show s <> " points"
+
 data Status
   = WaitingAI
   | WaitingHuman
+  | BadMove
+  | GameOver Score
 
 type State
   = { initialGame :: Game
@@ -66,7 +76,7 @@ initialState input =
 
 data Action
   = DoPass
-  | Resign
+  | Completed Result
   | Restart
   | AddStone MouseEvent
   | MouseMove MouseEvent
@@ -79,6 +89,8 @@ render state =
     message = case state.status of
       WaitingAI -> "GnuGO is playing"
       WaitingHuman -> "Your turn to play, place a stone"
+      BadMove -> "Invalid move, play again"
+      GameOver score' -> "Game is over: " <> showScore score'
 
     boardSize' = boardSize state.game.size
 
@@ -107,6 +119,20 @@ render state =
             <> showCapture "Black" state.game.black
             <> showCapture "White" state.game.white
         )
+
+    mainButton = case state.status of
+      GameOver (Score color _) -> case color == state.game.startingPlayer of
+        true ->
+          [ HH.a
+              [ HP.class_ (ClassName "btn btn-success"), HE.onClick \s -> Just $ Completed Win ]
+              [ HH.text "Complete" ]
+          ]
+        false -> []
+      _ ->
+        [ HH.a
+            [ HP.class_ (ClassName "btn btn-primary"), HE.onClick \s -> Just $ DoPass ]
+            [ HH.text "Pass" ]
+        ]
   in
     HH.div
       [ HP.class_ (ClassName "container") ]
@@ -121,16 +147,15 @@ render state =
           [ HH.div_
               [ board, infos ]
           , HH.div_
-              [ HH.a
-                  [ HP.class_ (ClassName "btn btn-primary"), HE.onClick \s -> Just $ DoPass ]
-                  [ HH.text "Pass" ]
-              , HH.a
-                  [ HP.class_ (ClassName "btn btn-secondary"), HE.onClick \s -> Just $ Restart ]
-                  [ HH.text "Restart" ]
-              , HH.a
-                  [ HP.class_ (ClassName "btn btn-danger"), HE.onClick \s -> Just $ Resign ]
-                  [ HH.text "Resign" ]
-              ]
+              ( mainButton
+                  <> [ HH.a
+                        [ HP.class_ (ClassName "btn btn-secondary"), HE.onClick \s -> Just $ Restart ]
+                        [ HH.text "Restart" ]
+                    , HH.a
+                        [ HP.class_ (ClassName "btn btn-danger"), HE.onClick \s -> Just $ Completed Loss ]
+                        [ HH.text "Resign" ]
+                    ]
+              )
           ]
       ]
 
@@ -161,9 +186,23 @@ aiPlay gnugo game = do
       log ("Couldn't load")
       pure game
 
+aiScore :: GnuGO.WASM -> Game -> Effect Score
+aiScore gnugo game = do
+  let
+    gameStr = save game
+  log ("scoring: " <> gameStr)
+  let
+    newScore = GnuGO.score gnugo 0 gameStr
+  log ("received: " <> show newScore)
+  pure
+    $ if newScore < 0.0 then
+        Score Black (newScore * -1.0)
+      else
+        Score White newScore
+
 handleAction :: forall m. MonadAff m => Action -> H.HalogenM State Action () Output m Unit
 handleAction = case _ of
-  Resign -> H.raise (Just Loss)
+  Completed result -> H.raise (Just result)
   Restart -> do
     state <- H.get
     H.modify_ \_ -> initialState { game: state.initialGame, gnugo: state.gnugo }
@@ -173,15 +212,9 @@ handleAction = case _ of
     state <- H.get
     case state.status of
       WaitingAI -> pure unit
-      WaitingHuman -> do
-        mCoord <- liftEffect $ mouseCoord e
-        case mCoord /= state.editCoord of
-          false -> pure unit
-          true -> do
-            H.modify_ \s -> s { editCoord = mCoord }
-            case mCoord of
-              Nothing -> pure unit
-              Just _ -> drawBoard
+      GameOver _ -> pure unit
+      BadMove -> moveMouse state e
+      WaitingHuman -> moveMouse state e
   MouseLeave -> do
     H.modify_ \s -> s { editCoord = Nothing }
     drawBoard
@@ -192,13 +225,24 @@ handleAction = case _ of
       Just coord -> play (PlaceStone coord) state
   DoPass -> H.get >>= play Pass
   where
+  moveMouse state e = do
+    mCoord <- liftEffect $ mouseCoord e
+    case mCoord /= state.editCoord of
+      false -> pure unit
+      true -> do
+        H.modify_ \s -> s { editCoord = mCoord }
+        case mCoord of
+          Nothing -> pure unit
+          Just _ -> drawBoard
+
   play :: PlayerMove -> State -> H.HalogenM State Action () Output m Unit
   play move state = case addMove (Move state.game.startingPlayer move) state.game of
-    Just newGame -> do
-      playAi state.gnugo newGame
+    Just newGame -> case isCompleted newGame of
+      true -> completeGame state.gnugo newGame
+      false -> playAi state.gnugo newGame
     Nothing -> do
-      liftEffect $ log "Invalid move"
-      pure unit
+      H.modify_ \s -> s { editCoord = Nothing, status = BadMove }
+      drawBoard
 
   playAi :: Maybe GnuGO.WASM -> Game -> H.HalogenM State Action () Output m Unit
   playAi gnugo' game = do
@@ -207,7 +251,7 @@ handleAction = case _ of
     _ <- do
       H.fork do
         -- This delay seems to help halogen render the waiting ai message
-        -- Otherwise it skip the update and only show waiting for humang again
+        -- Otherwise it skip the update and only show waiting for human again
         -- as if wasm is freezing the rendering loop
         H.liftAff (delay $ Milliseconds 10.0)
         newGame' <- case gnugo' of
@@ -218,8 +262,23 @@ handleAction = case _ of
           Just gnugo -> do
             g <- H.liftAff $ liftEffect $ aiPlay gnugo game
             pure g
-        H.modify_ \s -> s { game = newGame', status = WaitingHuman }
-        drawBoard
+        case isCompleted newGame' of
+          true -> completeGame gnugo' newGame'
+          false -> do
+            H.modify_ \s -> s { game = newGame', status = WaitingHuman }
+            drawBoard
+    pure unit
+
+  completeGame gnugo' game = do
+    score' <- case gnugo' of
+      Nothing -> do
+        H.liftAff (delay $ Milliseconds 1000.0)
+        -- Fake a score
+        pure (Score Black 1.0)
+      Just gnugo -> do
+        s <- H.liftAff $ liftEffect $ aiScore gnugo game
+        pure s
+    H.modify_ \s -> s { game = game, status = GameOver score' }
     pure unit
 
   drawBoard = do
@@ -231,8 +290,10 @@ handleAction = case _ of
         Just boardCanvas -> do
           let
             select = case Tuple state.status state.editCoord of
-              Tuple WaitingHuman (Just coord) -> Just (Tuple coord (Just state.game.startingPlayer))
-              _ -> Nothing
+              Tuple WaitingAI _ -> Nothing
+              Tuple (GameOver _) _ -> Nothing
+              Tuple _ (Just coord) -> Just (Tuple coord (Just state.game.startingPlayer))
+              Tuple _ _ -> Nothing
           boardCtx <- Canvas.getContext2D boardCanvas
           renderBoard boardCtx select state.game
         Nothing -> log "Where is the canvas?!"
