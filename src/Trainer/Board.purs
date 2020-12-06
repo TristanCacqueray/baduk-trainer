@@ -1,4 +1,4 @@
-module Trainer.Board (boardSize, renderBoard, mouseCoord) where
+module Trainer.Board (boardSize, renderMiniBoard, renderBoard, mouseCoord) where
 
 import Prelude
 import Baduk.Types (Coord(..), Game, Stone(..))
@@ -59,6 +59,43 @@ mouseCoord :: MouseEvent -> Effect (Maybe Coord)
 mouseCoord e = do
   pos <- relativePosition e
   pure (join $ snapPos <$> pos)
+
+renderMiniBoard :: Canvas.Context2D -> Game -> Effect Unit
+renderMiniBoard ctx game =
+  withContext ctx do
+    -- Background
+    setFillStyle ctx "#966F33"
+    fillPath ctx $ rect ctx { x: 0.0, y: 0.0, width: boardSize', height: boardSize' }
+    -- Grid
+    Canvas.beginPath ctx
+    for_ (range 0 (game.size - 1)) \n -> do
+      Canvas.strokePath ctx
+        $ do
+            let
+              startPos = (boardPadding / 2.0) + (stoneSize / 2.0) * (toNumber n)
+
+              endPos = boardSize' - (boardPadding / 2.0)
+            Canvas.moveTo ctx startPos (boardPadding / 2.0)
+            Canvas.lineTo ctx startPos endPos
+            Canvas.moveTo ctx (boardPadding / 2.0) startPos
+            Canvas.lineTo ctx endPos startPos
+            Canvas.closePath ctx
+    -- Stone
+    case game.stonesAlive of
+      Nil -> do
+        for_ (game.black.stones) (renderStone Black)
+        for_ (game.white.stones) (renderStone White)
+      xs -> for_ xs (\(Stone color coord) -> renderStone color coord)
+  where
+  boardSize' = toNumber $ boardSize game.size `div` 2
+
+  coordPos :: Int -> Number
+  coordPos x = boardPadding / 2.0 + toNumber x * (stoneSize / 2.0)
+
+  renderStone :: Color -> Coord -> Effect Unit
+  renderStone color (Coord x y) = do
+    setFillStyle ctx (showHexColor color)
+    fillPath ctx $ arc ctx { x: (coordPos x), y: (coordPos y), radius: 12.5 * 0.8, start: 0.0, end: Math.pi * 2.0 }
 
 renderBoard :: Canvas.Context2D -> Maybe (Tuple Coord (Maybe Color)) -> Game -> Effect Unit
 renderBoard ctx selection game =
