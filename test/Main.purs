@@ -1,15 +1,16 @@
 module Test.Main where
 
+import Baduk (loadBaduk)
+import Baduk as Baduk
 import Baduk.Converter (load, showBoard, readBoard)
 import Baduk.Game (addStone)
-import Baduk.Game as Baduk
 import Baduk.Types (Coord(..), Stone(..), initGame, showGame)
 import Control.Monad.Error.Class (class MonadThrow, throwError)
 import Data.Array (concat, intercalate)
 import Data.Array as A
 import Data.Either (Either(..))
 import Data.Functor (map)
-import Data.List (List(..), fromFoldable, sort)
+import Data.List (List(..), fromFoldable, sort, (:))
 import Data.Maybe (Maybe(..))
 import Data.String (null)
 import Data.Traversable (sequence_)
@@ -18,12 +19,33 @@ import Effect (Effect)
 import Effect.Aff (launchAff_)
 import Effect.Exception (Error, error)
 import Prelude (Unit, discard, pure, show, unit, ($), (<>), (==), (/=), bind)
-import SGF (loadBaduk)
-import SGF.Parser (parse)
-import SGF.Types (Color(..), GameTree, demo)
+import SGF (Color(..), GameTree(..), Property(..), SGF, Sequence, Value(..), parse)
 import Test.Spec (describe, it)
 import Test.Spec.Reporter.Console (consoleReporter)
 import Test.Spec.Runner (runSpec)
+
+-- A SGF instance for testing purpose
+sampleSGF ∷ SGF
+sampleSGF = game : Nil
+  where
+  game ∷ GameTree
+  game = GameTree seq Nil
+
+  seq ∷ Sequence
+  seq = (size : Nil) : (pos Black : Nil) : (player Black : Nil) : Nil
+
+  size ∷ Property
+  size = Prop "SZ" (Num 5.0 : Nil)
+
+  pos ∷ Color → Property
+  pos col = Prop (colorName col) (Point 1 1 : Point 2 1 : Nil)
+    where
+    colorName Black = "AB"
+
+    colorName White = "AW"
+
+  player ∷ Color → Property
+  player col = Prop "PL" (Color col : Nil)
 
 checkLoader :: forall m. MonadThrow Error m => List GameTree -> m Unit
 checkLoader sgf = do
@@ -69,7 +91,7 @@ main =
         describe "purescript-gnugo" do
           describe "Parser" $ sequence_ parserTests
           describe "Converter" do
-            it "load demo sgf" (checkLoader demo)
+            it "load demo sgf" (checkLoader sampleSGF)
             it "print game" checkShowGame
             it "save game" checkSaveGame
           describe "Game" $ sequence_ playTests

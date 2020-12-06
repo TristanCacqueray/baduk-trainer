@@ -1,8 +1,8 @@
-module SGF.Parser where
+module SGF.Parser (parse) where
 
 import Control.Alt ((<|>))
 import Control.Lazy (fix)
-import Data.Array as A
+import Data.Array (some) as A
 import Data.Char (toCharCode)
 import Data.Either (Either)
 import Data.List (many, some)
@@ -85,6 +85,7 @@ sequence = do
   n <- some node
   pure $ n
 
+-- note: this is the `fix` trick to enable recursive parser
 gameTree :: P GameTree -> P GameTree
 gameTree p = do
   gt <- between (string "(") (string ")") gameTree'

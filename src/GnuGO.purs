@@ -1,3 +1,4 @@
+-- | GnuGO wasm binding, need: https://github.com/TristanCacqueray/wasm-gnugo
 module GnuGO
   ( WASM
   , withWasm

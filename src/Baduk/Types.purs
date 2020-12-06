@@ -1,8 +1,7 @@
 module Baduk.Types where
 
-import Data.Eq (class Eq)
 import Data.List (List(Nil))
-import Prelude (class Ord, class Show, show, (<>))
+import Prelude
 import SGF.Types (Color(..))
 
 data Coord
@@ -17,6 +16,14 @@ data Stone
 
 data Capture
   = Capture Int (List Coord)
+
+data Result
+  = Win
+  | Loss
+
+instance showResult :: Show Result where
+  show Win = "win"
+  show Loss = "loss"
 
 instance showPoint :: Show Coord where
   show (Coord x y) = "(Coord " <> show x <> " " <> show y <> ")"
@@ -48,7 +55,9 @@ derive instance ordStone :: Ord Stone
 type Player
   = { stones :: List Coord, moves :: List Coord, captures :: List Capture }
 
--- derive instance eqPlayer :: Eq Player
+initPlayer :: Player
+initPlayer = { stones: Nil, moves: Nil, captures: Nil }
+
 type Game
   = { name :: String
     , size :: Int
@@ -58,18 +67,6 @@ type Game
     , move :: Int
     , stonesAlive :: List Stone
     }
-
--- derive instance eqGame :: Eq Game
-showGame :: Game -> String
-showGame game = "<Baduk size=" <> show game.size <> " stones=" <> show game.stonesAlive <> " />"
-
-initPlayer :: Player
-initPlayer = { stones: Nil, moves: Nil, captures: Nil }
-
-getPlayer :: Game -> Color -> Player
-getPlayer game = case _ of
-  Black -> game.black
-  White -> game.white
 
 initGame :: Game
 initGame =
@@ -81,3 +78,11 @@ initGame =
   , move: 0
   , stonesAlive: Nil
   }
+
+showGame :: Game -> String
+showGame game = "<Baduk size=" <> show game.size <> " stones=" <> show game.stonesAlive <> " />"
+
+getPlayer :: Game -> Color -> Player
+getPlayer game = case _ of
+  Black -> game.black
+  White -> game.white

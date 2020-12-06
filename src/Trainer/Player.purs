@@ -1,16 +1,11 @@
-module Player where
+module Trainer.Player (Input, Slot, Output, component) where
 
 import Prelude
-import Baduk (Game) as Baduk
-import Baduk.Game (save, setStone) as Baduk
-import Baduk.Game as Baduk
-import Baduk.Game as Badul
-import Baduk.Types (Coord, Stone(..))
+import Baduk (Coord, Stone(..), Game, Result(..), addStone, getLastMove, loadBaduk, save, initAliveStones)
 import Data.List (List(..), length)
 import Data.Maybe (Maybe(..))
 import Data.Time.Duration (Milliseconds(..))
 import Data.Tuple (Tuple(..))
-import Editor as Editor
 import Effect (Effect)
 import Effect.Aff (delay)
 import Effect.Aff.Class (class MonadAff)
@@ -25,11 +20,11 @@ import Halogen.HTML as HH
 import Halogen.HTML.Core (PropName(..), ClassName(..))
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
-import SGF as SGF
+import Trainer.Board (boardSize, mouseCoord, renderBoard)
 import Web.UIEvent.MouseEvent (MouseEvent)
 
 type Input
-  = { game :: Baduk.Game
+  = { game :: Game
     , gnugo :: Maybe GnuGO.WASM
     }
 
@@ -38,14 +33,6 @@ type Output
 
 type Slot id
   = forall query. H.Slot query Output id
-
-data Result
-  = Win
-  | Loss
-
-instance showResult :: Show Result where
-  show Win = "win"
-  show Loss = "loss"
 
 component :: forall query m. MonadAff m => MonadEffect m => H.Component HH.HTML query Input Output m
 component =
@@ -60,9 +47,9 @@ data Status
   | WaitingHuman
 
 type State
-  = { initialGame :: Baduk.Game
+  = { initialGame :: Game
     , gnugo :: Maybe GnuGO.WASM
-    , game :: Baduk.Game
+    , game :: Game
     , editCoord :: Maybe Coord
     , status :: Status
     }
@@ -71,7 +58,7 @@ initialState :: Input -> State
 initialState input =
   { initialGame: input.game
   , gnugo: input.gnugo
-  , game: Badul.setAliveStones input.game
+  , game: initAliveStones input.game
   , editCoord: Nothing
   , status: WaitingHuman
   }
@@ -92,7 +79,7 @@ render state =
       WaitingAI -> "GnuGO is playing"
       WaitingHuman -> "Your turn to play, place a stone"
 
-    boardSize' = Editor.boardSize state.game.size
+    boardSize' = boardSize state.game.size
 
     board =
       HH.canvas
@@ -146,22 +133,22 @@ render state =
           ]
       ]
 
-aiPlay :: GnuGO.WASM -> Baduk.Game -> Effect Baduk.Game
+aiPlay :: GnuGO.WASM -> Game -> Effect Game
 aiPlay gnugo game = do
   let
-    gameStr = Baduk.save game
+    gameStr = save game
   log ("sending: " <> gameStr)
   let
     newGameStr = GnuGO.play gnugo 0 gameStr
   log ("received: " <> newGameStr)
-  case SGF.loadBaduk newGameStr of
+  case loadBaduk newGameStr of
     -- revert starting player inversion
     Just g -> do
       log ("loaded game: " <> show g)
-      case Baduk.getLastMove g of
+      case getLastMove g of
         Just move -> do
           log ("adding: " <> show move)
-          case Baduk.addStone move game of
+          case addStone move game of
             Just newGame -> pure newGame
             Nothing -> do
               log ("No new-move?!")
@@ -186,7 +173,7 @@ handleAction = case _ of
     case state.status of
       WaitingAI -> pure unit
       WaitingHuman -> do
-        mCoord <- liftEffect $ Editor.mouseCoord e
+        mCoord <- liftEffect $ mouseCoord e
         case mCoord /= state.editCoord of
           false -> pure unit
           true -> do
@@ -198,7 +185,7 @@ handleAction = case _ of
     state <- H.get
     case state.editCoord of
       Nothing -> pure unit
-      Just coord -> case Badul.addStone (Stone state.game.startingPlayer coord) state.game of
+      Just coord -> case addStone (Stone state.game.startingPlayer coord) state.game of
         Just newGame -> do
           H.modify_ \s -> s { game = newGame, status = WaitingAI }
           drawBoard
@@ -239,5 +226,5 @@ handleAction = case _ of
               Tuple WaitingHuman (Just coord) -> Just (Tuple coord (Just state.game.startingPlayer))
               _ -> Nothing
           boardCtx <- Canvas.getContext2D boardCanvas
-          Editor.renderBoard boardCtx select state.game
+          renderBoard boardCtx select state.game
         Nothing -> log "Where is the canvas?!"

@@ -1,10 +1,8 @@
 module SGF.Types where
 
-import Data.Eq
-import Control.Semigroupoid ((<<<))
-import Data.List (List(..), concat, concatMap, null, singleton, (:))
-import Data.Monoid ((<>))
-import Prelude (class Ord, class Show, map, otherwise, show)
+import Data.Eq (class Eq)
+import Data.List (List)
+import Prelude (class Ord, class Show, show, (<>))
 
 -- https://www.red-bean.com/sgf/sgf4.html
 type SGF
@@ -58,46 +56,3 @@ instance showColor ∷ Show Color where
 derive instance eqColor :: Eq Color
 
 derive instance ordColor :: Ord Color
-
-showHexColor :: Color -> String
-showHexColor Black = "#000"
-
-showHexColor White = "#FFF"
-
-type FlatSGF
-  = List (List Property)
-
--- A simpler representation of the SGF trees
-flatten ∷ SGF → FlatSGF
-flatten = flattenSequence <<< concatMap flattenGameTree
-  where
-  flattenSequence ∷ List Sequence → List (List Property)
-  flattenSequence = map concat
-
-  flattenGameTree ∷ GameTree → List Sequence
-  flattenGameTree (GameTree seq gametrees)
-    | null gametrees = singleton seq
-    | otherwise = seq : concatMap flattenGameTree gametrees
-
--- A SGF instance for testing purpose
-demo ∷ SGF
-demo = game : Nil
-  where
-  game ∷ GameTree
-  game = GameTree seq Nil
-
-  seq ∷ Sequence
-  seq = (size : Nil) : (pos Black : Nil) : (player Black : Nil) : Nil
-
-  size ∷ Property
-  size = Prop "SZ" (Num 5.0 : Nil)
-
-  pos ∷ Color → Property
-  pos col = Prop (colorName col) (Point 1 1 : Point 2 1 : Nil)
-    where
-    colorName Black = "AB"
-
-    colorName White = "AW"
-
-  player ∷ Color → Property
-  player col = Prop "PL" (Color col : Nil)

@@ -1,22 +1,27 @@
-module Baduk.Converter (load, showBoard, readBoard) where
+-- | Convertion functions for the Baduk Game type
+module Baduk.Converter (load, save, showBoard, readBoard) where
 
-import SGF.Types
-import Baduk.Types (Coord(..), Game, Position(..), Stone(..), initGame)
+import Baduk.Types (Coord(..), Game, getPlayer, Position(..), Stone(..), initGame)
 import Control.Monad.Except (ExceptT, runExceptT, throwError)
 import Control.Monad.State (StateT, execStateT, get, modify)
 import Control.Monad.Writer (WriterT, runWriterT, tell)
 import Data.Array (cons, drop, mapWithIndex, reverse, take)
+import Data.Char (fromCharCode, toCharCode)
 import Data.Either (Either)
-import Data.Foldable (elem, traverse_)
+import Data.Foldable (elem, foldMap, traverse_)
 import Data.Identity (Identity)
 import Data.Int (round)
-import Data.List (List(..), catMaybes, fromFoldable, head, uncons, (:))
-import Data.Maybe (Maybe(..))
+import Data.List (List(..), (:))
+import Data.List as L
+import Data.List.Lazy (replicate)
+import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Newtype (unwrap)
-import Data.String (CodePoint, codePointFromChar, length, toCodePointArray)
+import Data.String (CodePoint, codePointFromChar, length, null, toCodePointArray)
+import Data.String.CodeUnits (singleton)
 import Data.Traversable (for)
-import Data.Tuple (Tuple)
-import Prelude (identity, mod, otherwise, pure, show, ($), (*), (*>), (+), (-), (/), (<>), (==), (>>=), (||))
+import Data.Tuple (Tuple(..))
+import Prelude
+import SGF (Color(..), FlatSGF, Property(..), SGF, Value(..), flatten, inverseColor)
 
 type Error
   = String
@@ -33,7 +38,7 @@ loader fsgf = case onlyHead fsgf of
   Nothing → throwError "Only single tree game are currently supported"
   where
   onlyHead ∷ ∀ a. List a → Maybe a
-  onlyHead xs = case uncons xs of
+  onlyHead xs = case L.uncons xs of
     Just { head: a, tail: Nil } → Just a
     _ → Nothing
 
@@ -82,6 +87,52 @@ loader fsgf = case onlyHead fsgf of
 load ∷ SGF → Either Error (Tuple Game Log)
 load sgf = unwrap $ runExceptT $ runWriterT $ execStateT (loader (flatten sgf)) initGame
 
+saveCoord :: Coord -> String
+saveCoord (Coord x y) = "[" <> savePos x <> savePos y <> "]"
+  where
+  savePos :: Int -> String
+  savePos p = fromMaybe "" $ singleton <$> fromCharCode (toCharCode 'a' + p)
+
+save :: Game -> String
+save g =
+  L.intercalate "\n"
+    ( [ "(;" <> gameName <> "SZ[" <> show g.size <> "]" <> "PL[" <> show g.startingPlayer <> "]" ]
+        <> addStones "B" g.black.stones
+        <> addStones "W" g.white.stones
+        <> [ ";" <> stonePlayed <> ")" ]
+    )
+  where
+  gameName = if null g.name && g.name /= "Unknown" then "" else ("GN[" <> g.name <> "]")
+
+  addStones _ Nil = []
+
+  addStones c xs = [ ";A" <> c <> foldMap saveCoord xs ]
+
+  stonePlayed :: String
+  stonePlayed =
+    L.intercalate "(;"
+      (map showPlayedPos allStonePlayed)
+      <> L.intercalate "" (replicate (L.length allStonePlayed - 1) ")")
+
+  showPlayedPos :: Tuple Color Coord -> String
+  showPlayedPos (Tuple color coord) = show color <> saveCoord coord
+
+  allStonePlayed :: List (Tuple Color Coord)
+  allStonePlayed = L.reverse $ interleave starting opponent
+
+  interleave :: forall a. List a -> List a -> List a
+  interleave (Cons x xs) o = Cons x (interleave o xs)
+
+  interleave _ (Cons x xs) = Cons x (interleave xs Nil)
+
+  interleave _ _ = Nil
+
+  starting :: List (Tuple Color Coord)
+  starting = map (Tuple g.startingPlayer) (getPlayer g g.startingPlayer).moves
+
+  opponent :: List (Tuple Color Coord)
+  opponent = map (Tuple (inverseColor g.startingPlayer)) (getPlayer g (inverseColor g.startingPlayer)).moves
+
 coordToIdx ∷ Int → Coord → Int
 coordToIdx sz (Coord cx cy) = cx + cy * sz
 
@@ -95,12 +146,16 @@ idxToCoord sz idx = Coord x y
 readBoard :: List String -> Maybe Game
 readBoard xs = getSize >>= \s -> pure (initGame { size = s, stonesAlive = go 0 xs })
   where
-  getSize = head xs >>= \x -> pure $ length x
+  getSize = L.head xs >>= \x -> pure $ length x
 
   go :: Int -> List String -> List Stone
-  go _ Nil = Nil
-
-  go pos (Cons x rest) = (catMaybes $ fromFoldable $ mapWithIndex (goRow pos) (toCodePointArray x)) <> (go (pos + 1) rest)
+  go pos = case _ of
+    Nil -> Nil
+    (Cons x rest) ->
+      let
+        row = (L.catMaybes $ L.fromFoldable $ mapWithIndex (goRow pos) (toCodePointArray x))
+      in
+        row <> (go (pos + 1) rest)
 
   goRow :: Int -> Int -> CodePoint -> Maybe Stone
   goRow x y cp
@@ -108,6 +163,7 @@ readBoard xs = getSize >>= \s -> pure (initGame { size = s, stonesAlive = go 0 x
     | cp == codePointFromChar 'w' = pure $ Stone White (Coord x y)
     | otherwise = Nothing
 
+-- TODO: use initAliveStones before rendering the board, this is only used in tests.
 getBoard ∷ Game → Array Position
 getBoard game@{ size: size, black: bplayer, white: wplayer } = reverse (create (game.size * game.size))
   where

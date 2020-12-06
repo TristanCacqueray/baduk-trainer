@@ -1,22 +1,17 @@
-module Baduk.Game where
+-- | Baduk game logic
+module Baduk.Game (addStone, initAliveStones, getLastMove, setStone, removeStone) where
 
-import SGF.Types
 import Baduk.Types (Capture(..), Coord(..), Game, Player, Stone(..), getPlayer)
-import Data.Char (fromCharCode, toCharCode)
 import Data.Foldable (find)
-import Data.List (List(..), elem, filter, foldMap, head, intercalate, last, length, nub, reverse, snoc, (:))
+import Data.List (List(..), elem, filter, head, length, nub, snoc, (:))
 import Data.List as Data.List
-import Data.List.Lazy (replicate)
-import Data.Maybe (Maybe(..), fromMaybe)
-import Data.String (null)
-import Data.String.CodeUnits (singleton)
-import Data.Tuple (Tuple(..))
-import Prelude (eq, flip, map, not, otherwise, show, ($), (&&), (+), (-), (<), (<$>), (<<<), (<>), (/=), (==), (>=), (||), (>))
-import SGF (inverse)
+import Data.Maybe (Maybe(..))
+import Prelude
+import SGF (Color(..), inverseColor)
 
 -- | Initial board when the game start
-setAliveStones :: Game -> Game
-setAliveStones game = game { stonesAlive = blackStones <> whiteStones }
+initAliveStones :: Game -> Game
+initAliveStones game = game { stonesAlive = blackStones <> whiteStones }
   where
   blackStones = map (Stone Black) game.black.stones
 
@@ -71,7 +66,7 @@ getGroup sz stonesAlive origin = case find ((==) origin <<< getCoord) stonesAliv
         $ go (move coord Right)
         $ g { members = coord : g.members }
     -- Coord is empty
-    | inBoard coord sz && not elem (Stone (inverse g.color) coord) stonesAlive = g { liberties = coord : g.liberties }
+    | inBoard coord sz && not elem (Stone (inverseColor g.color) coord) stonesAlive = g { liberties = coord : g.liberties }
     -- Coord is blocked
     | otherwise = g
 
@@ -120,7 +115,7 @@ getLastMove game
   | length game.black.moves < length game.white.moves = lastStone White game.white.moves
   | otherwise =
     let
-      oponent = inverse game.startingPlayer
+      oponent = inverseColor game.startingPlayer
     in
       lastStone oponent (getPlayer game oponent).moves
 
@@ -169,49 +164,3 @@ removeStone g coord
   | coord `elem` g.black.stones = g { black = removePlayerStone g.black coord }
   | coord `elem` g.white.stones = g { white = removePlayerStone g.white coord }
   | otherwise = g
-
-saveCoord :: Coord -> String
-saveCoord (Coord x y) = "[" <> savePos x <> savePos y <> "]"
-  where
-  savePos :: Int -> String
-  savePos p = fromMaybe "" $ singleton <$> fromCharCode (toCharCode 'a' + p)
-
-save :: Game -> String
-save g =
-  intercalate "\n"
-    ( [ "(;" <> gameName <> "SZ[" <> show g.size <> "]" <> "PL[" <> show g.startingPlayer <> "]" ]
-        <> addStones "B" g.black.stones
-        <> addStones "W" g.white.stones
-        <> [ ";" <> stonePlayed <> ")" ]
-    )
-  where
-  gameName = if null g.name && g.name /= "Unknown" then "" else ("GN[" <> g.name <> "]")
-
-  addStones _ Nil = []
-
-  addStones c xs = [ ";A" <> c <> foldMap saveCoord xs ]
-
-  stonePlayed :: String
-  stonePlayed =
-    intercalate "(;"
-      (map showPlayedPos allStonePlayed)
-      <> intercalate "" (replicate (length allStonePlayed - 1) ")")
-
-  showPlayedPos :: Tuple Color Coord -> String
-  showPlayedPos (Tuple color coord) = show color <> saveCoord coord
-
-  allStonePlayed :: List (Tuple Color Coord)
-  allStonePlayed = reverse $ interleave starting opponent
-
-  interleave :: forall a. List a -> List a -> List a
-  interleave (Cons x xs) o = Cons x (interleave o xs)
-
-  interleave _ (Cons x xs) = Cons x (interleave xs Nil)
-
-  interleave _ _ = Nil
-
-  starting :: List (Tuple Color Coord)
-  starting = map (Tuple g.startingPlayer) (getPlayer g g.startingPlayer).moves
-
-  opponent :: List (Tuple Color Coord)
-  opponent = map (Tuple (inverse g.startingPlayer)) (getPlayer g (inverse g.startingPlayer)).moves

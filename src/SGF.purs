@@ -1,25 +1,43 @@
-module SGF where
+-- | Smart Game Format module entry point
+module SGF
+  ( module SGF.Types
+  , module SGF.Parser
+  -- | utility to simplify sgf representation
+  , FlatSGF(..)
+  , flatten
+  -- | utilities
+  , inverseColor
+  , showHexColor
+  ) where
 
-import Prelude (const, (>>=))
-import Data.Maybe (Maybe(..))
-import Data.Either (Either(..))
-import Data.Tuple (Tuple(..))
-import Baduk.Types (Game)
-import Baduk.Converter (load)
+-- import Baduk.Converter (load)
+import Data.List (List, concat, concatMap, null, singleton, (:))
+import Prelude (map, otherwise, (<<<))
 import SGF.Parser (parse)
-import SGF.Types
+import SGF.Types (Color(..), GameTree(..), Property(..), SGF, Sequence, Value(..))
 
-mapError :: forall a b ok. (a -> b) -> Either a ok -> Either b ok
-mapError f e = case e of
-  Right x -> Right x
-  Left x -> Left (f x)
-
-loadBaduk :: String -> Maybe Game
-loadBaduk s = case mapError (const "error") (parse s) >>= load of
-  Right (Tuple game log) -> Just game
-  _ -> Nothing
-
-inverse :: Color -> Color
-inverse = case _ of
+-- utility
+inverseColor :: Color -> Color
+inverseColor = case _ of
   White -> Black
   Black -> White
+
+showHexColor :: Color -> String
+showHexColor = case _ of
+  Black -> "#000"
+  White -> "#FFF"
+
+-- A simpler representation of the SGF trees without branching
+type FlatSGF
+  = List (List Property)
+
+flatten ∷ SGF → FlatSGF
+flatten = flattenSequence <<< concatMap flattenGameTree
+  where
+  flattenSequence ∷ List Sequence → List (List Property)
+  flattenSequence = map concat
+
+  flattenGameTree ∷ GameTree → List Sequence
+  flattenGameTree (GameTree seq gametrees)
+    | null gametrees = singleton seq
+    | otherwise = seq : concatMap flattenGameTree gametrees
