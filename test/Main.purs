@@ -216,7 +216,7 @@ main =
 
   testStr =
     intercalate "\n"
-      [ "(;SZ[19]PL[B]"
+      [ "(;SZ[19]KM[6.5]PL[B]"
       , ";W[ec](;B[bc](;W[eb](;B[bb]))))"
       ]
 

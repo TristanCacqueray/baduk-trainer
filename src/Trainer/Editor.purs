@@ -10,6 +10,7 @@ module Trainer.Editor
 import Baduk (Coord, Game, initGame, loadBaduk)
 import Baduk as Baduk
 import Data.Maybe (Maybe(..))
+import Data.Number (fromString)
 import Data.Traversable (sequence, traverse)
 import Data.Tuple (Tuple(..))
 import Effect (Effect)
@@ -172,6 +173,13 @@ renderSGFEditor state = do
                     ]
                 ]
             , HH.div_
+                [ HH.text "Komi: "
+                , HH.input
+                    [ HP.value (show state.game.komi)
+                    , HE.onValueInput (Just <<< ChangeKomi)
+                    ]
+                ]
+            , HH.div_
                 [ HH.a
                     [ HP.class_ (ClassName "btn btn-primary"), HE.onClick \s -> Just $ Save ]
                     [ HH.text "Save" ]
@@ -192,6 +200,7 @@ data Action
   | AddStone
   | MouseMove MouseEvent
   | ChangeName String
+  | ChangeKomi String
   | ClearSelection
   | Save
   | Cancel
@@ -213,6 +222,9 @@ handleSGFEditorAction = case _ of
     drawCanvases
   ChangeName name -> do
     H.modify_ \s -> s { game = s.game { name = name } }
+  ChangeKomi name -> case fromString name of
+    Just komi -> H.modify_ \s -> s { game = s.game { komi = komi } }
+    Nothing -> pure unit
   Save -> do
     state <- H.get
     H.raise $ Just (Baduk.save state.game)

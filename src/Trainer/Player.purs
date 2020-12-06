@@ -105,17 +105,20 @@ render state =
         , HE.onMouseLeave \e -> Just MouseLeave
         ]
 
-    item txt =
+    item :: forall v. Show v => String -> v -> _
+    item txt v =
       HH.span_
-        [ HH.text txt ]
+        [ HH.text (" | " <> txt <> ": "), HH.b_ [ HH.text (show v) ] ]
 
     showCapture name player = case player.captures of
       Nil -> []
-      captures -> [ item (name <> " captures: " <> (show $ length captures)) ]
+      captures -> [ item (name <> " captures") (length captures) ]
 
     infos =
       HH.div_
-        ( [ item ("Move: " <> show state.game.move) ]
+        ( [ item "Move" state.game.move
+          , item "Komi" state.game.komi
+          ]
             <> showCapture "Black" state.game.black
             <> showCapture "White" state.game.white
         )

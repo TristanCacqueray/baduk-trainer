@@ -78,6 +78,7 @@ initPlayer = { stones: Nil, moves: Nil, captures: Nil }
 
 type Game
   = { name :: String
+    , komi :: Number
     , size :: Int
     , startingPlayer :: Color
     , black :: Player
@@ -89,6 +90,7 @@ type Game
 initGame :: Game
 initGame =
   { name: ""
+  , komi: 6.5
   , size: 19
   , startingPlayer: Black
   , black: initPlayer

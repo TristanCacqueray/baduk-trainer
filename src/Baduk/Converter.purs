@@ -47,6 +47,8 @@ loader fsgf = case onlyHead fsgf of
 
   go (Prop "SZ" (Num n : Nil)) = modify (\game → game { size = round n })
 
+  go (Prop "KM" (Num n : Nil)) = modify (\game → game { komi = n })
+
   go (Prop "PL" (Color col : Nil)) = modify (\game → game { startingPlayer = col })
 
   go (Prop "AB" vals) = setStones Black vals
@@ -99,7 +101,7 @@ saveCoord (Coord x y) = "[" <> savePos x <> savePos y <> "]"
 save :: Game -> String
 save g =
   L.intercalate "\n"
-    ( [ "(;" <> gameName <> "SZ[" <> show g.size <> "]" <> "PL[" <> show g.startingPlayer <> "]" ]
+    ( [ "(;" <> gameName <> "SZ[" <> show g.size <> "]" <> "KM[" <> show g.komi <> "]PL[" <> show g.startingPlayer <> "]" ]
         <> addStones "B" g.black.stones
         <> addStones "W" g.white.stones
         <> [ ";" <> stonePlayed <> ")" ]
