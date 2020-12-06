@@ -146,6 +146,25 @@ main =
                   , " b b "
                   ]
             }
+          , { name: "inner capture"
+            , start:
+                fromFoldable
+                  [ " bw b "
+                  , "  bw  "
+                  , " b bw "
+                  , " bbw  "
+                  , "      "
+                  ]
+            , move: (Stone White (Coord 2 2))
+            , want:
+                fromFoldable
+                  [ " bw b "
+                  , "  bw  "
+                  , " bw w "
+                  , " bbw  "
+                  , "      "
+                  ]
+            }
           ]
       )
 
@@ -165,7 +184,9 @@ main =
         throwError (error ("Wanted: " <> showGame expected <> "\n  Got:    " <> showGame got))
       else
         pure unit
-    Nothing -> throwError (error "Can't play")
+    Nothing -> case readBoard start of
+      Nothing -> throwError (error ("Can't read" <> show start))
+      Just startingGame -> throwError (error $ "Can't play " <> show startingGame.stonesAlive <> " move: " <> show move)
 
   sgfStr =
     intercalate "\n"

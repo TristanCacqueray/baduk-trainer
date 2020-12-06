@@ -1,5 +1,16 @@
 -- | Baduk game logic
-module Baduk.Game (addMove, addStone, initAliveStones, isCompleted, getLastMove, setStone, removeStone) where
+module Baduk.Game
+  ( addMove
+  , addStone
+  , initAliveStones
+  , isCompleted
+  , getLastMove
+  , setStone
+  , removeStone
+  -- Export for debugging purpose
+  , removeDeadStones
+  , getGroup
+  ) where
 
 import Baduk.Types (Capture(..), Coord(..), Game, Player, PlayerMove(..), Stone(..), Move(..), getPlayer)
 import Data.Foldable (find)
@@ -77,7 +88,7 @@ getGroup sz stonesAlive origin = case find ((==) origin <<< getCoord) stonesAliv
     -- Coord is blocked
     | otherwise = g
 
--- | Remove dead stones at and around Coord location
+-- | Remove dead stones around Coord location
 removeDeadStones :: Size -> List Stone -> Coord -> List Stone
 removeDeadStones sz xs coord = filter isAlive xs
   where
@@ -86,11 +97,10 @@ removeDeadStones sz xs coord = filter isAlive xs
 
   captures :: List Stone
   captures =
-    nub $ captured coord
-      <> captured (move coord Up)
+    nub
+      $ captured (move coord Up)
       <> captured (move coord Down)
-      -- <> captured (move coord Left)
-
+      <> captured (move coord Left)
       <> captured (move coord Right)
 
   captured :: Coord -> List Stone
