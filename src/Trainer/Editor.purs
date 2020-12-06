@@ -7,8 +7,10 @@ module Trainer.Editor
   , renderMignature
   ) where
 
+import Prelude
 import Baduk (Coord, Game, initGame, loadBaduk)
 import Baduk as Baduk
+import Data.Int (round)
 import Data.Maybe (Maybe(..))
 import Data.Number (fromString)
 import Data.Traversable (sequence, traverse)
@@ -24,7 +26,6 @@ import Halogen.HTML.Core (PropName(..), ClassName(..))
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Math as Math
-import Prelude
 import SGF (Color(..), showHexColor)
 import Trainer.Board (boardSize, renderBoard, mouseCoord)
 import Web.UIEvent.MouseEvent (MouseEvent)
@@ -173,6 +174,13 @@ renderSGFEditor state = do
                     ]
                 ]
             , HH.div_
+                [ HH.text "Size: "
+                , HH.input
+                    [ HP.value (show state.game.size)
+                    , HE.onValueInput (Just <<< ChangeSize)
+                    ]
+                ]
+            , HH.div_
                 [ HH.text "Komi: "
                 , HH.input
                     [ HP.value (show state.game.komi)
@@ -205,6 +213,7 @@ data Action
   | MouseMove MouseEvent
   | ChangeName String
   | ChangeKomi String
+  | ChangeSize String
   | ClearSelection
   | Save
   | Cancel
@@ -228,6 +237,11 @@ handleSGFEditorAction = case _ of
     H.modify_ \s -> s { game = s.game { name = name } }
   ChangeKomi name -> case fromString name of
     Just komi -> H.modify_ \s -> s { game = s.game { komi = komi } }
+    Nothing -> pure unit
+  ChangeSize name -> case fromString name of
+    Just size -> do
+      H.modify_ \s -> s { game = s.game { size = round size } }
+      drawCanvases
     Nothing -> pure unit
   Save -> do
     state <- H.get
