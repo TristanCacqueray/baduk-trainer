@@ -180,6 +180,10 @@ renderSGFEditor state = do
                     ]
                 ]
             , HH.div_
+                [ HH.text "Starting player: "
+                , HH.text (show state.game.startingPlayer)
+                ]
+            , HH.div_
                 [ HH.a
                     [ HP.class_ (ClassName "btn btn-primary"), HE.onClick \s -> Just $ Save ]
                     [ HH.text "Save" ]
