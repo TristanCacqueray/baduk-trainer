@@ -153,7 +153,7 @@ render state =
           [ HP.class_ (ClassName "row") ]
           (toUnfoldable $ mapWithIndex renderGamePicker state.trainingGames)
       ]
-    EditGame n s -> [ HH.slot editor unit Editor.component s (Just <<< Edited n) ]
+    EditGame n s -> [ HH.slot editor unit Editor.component { sgfStr: s, gnugo: state.gnugo } (Just <<< Edited n) ]
     PlayGame n s -> case loadBaduk s of
       Just g -> [ HH.slot player unit Player.component { game: g, gnugo: state.gnugo } (Just <<< Played n) ]
       Nothing -> [ HH.text ("Invalid game: " <> s) ]

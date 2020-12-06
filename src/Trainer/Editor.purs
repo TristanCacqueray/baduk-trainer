@@ -8,16 +8,19 @@ module Trainer.Editor
   ) where
 
 import Prelude
-import Baduk (Coord, Game, initGame, loadBaduk)
+import Baduk (Coord, Game, Result, initGame, loadBaduk)
 import Baduk as Baduk
 import Data.Int (round)
 import Data.Maybe (Maybe(..))
 import Data.Number (fromString)
+import Data.Symbol (SProxy(..))
 import Data.Traversable (sequence, traverse)
 import Data.Tuple (Tuple(..))
 import Effect (Effect)
+import Effect.Aff.Class (class MonadAff)
 import Effect.Class (class MonadEffect, liftEffect)
 import Effect.Console (logShow)
+import GnuGO as GnuGO
 import Graphics.Canvas (CanvasElement, arc, fillPath, getCanvasElementById, rect, setFillStyle, translate, withContext)
 import Graphics.Canvas as Canvas
 import Halogen as H
@@ -28,10 +31,13 @@ import Halogen.HTML.Properties as HP
 import Math as Math
 import SGF (Color(..), showHexColor)
 import Trainer.Board (boardSize, renderBoard, mouseCoord)
+import Trainer.Player as Player
 import Web.UIEvent.MouseEvent (MouseEvent)
 
 type Input
-  = String
+  = { sgfStr :: String
+    , gnugo :: Maybe GnuGO.WASM
+    }
 
 type Output
   = Maybe String
@@ -39,7 +45,12 @@ type Output
 type Slot id
   = forall query. H.Slot query Output id
 
-component :: forall query m. MonadEffect m => H.Component HH.HTML query Input Output m
+type Slots
+  = ( testPlayer :: Player.Slot Unit )
+
+player = SProxy :: SProxy "testPlayer"
+
+component :: forall query m. MonadAff m => MonadEffect m => H.Component HH.HTML query Input Output m
 component =
   H.mkComponent
     { initialState: initialSGFEditorState
@@ -48,7 +59,7 @@ component =
     }
 
 initialSGFEditorState :: Input -> State
-initialSGFEditorState sgfStr = { editColor: AddBlackStone, editPos: Nothing, message, game }
+initialSGFEditorState { sgfStr, gnugo } = { editColor: AddBlackStone, editPos: Nothing, message, mode: Edit, game, gnugo }
   where
   Tuple game message = case loadBaduk sgfStr of
     Just g -> Tuple g ""
@@ -101,11 +112,17 @@ stoneSelectorToColor s = case s of
   AddWhiteStone -> Just White
   RemoveStone -> Nothing
 
+data Mode
+  = Edit
+  | Test
+
 type State
   = { editColor :: StoneSelector
     , editPos :: Maybe (Tuple Coord (Maybe Color))
     , message :: String
+    , mode :: Mode
     , game :: Game
+    , gnugo :: Maybe GnuGO.WASM
     }
 
 -- Render
@@ -116,7 +133,7 @@ renderMignature width sgfStr =
     ]
     [ HH.text sgfStr ]
 
-renderSGFEditor :: forall m. MonadEffect m => State -> H.ComponentHTML Action () m
+renderSGFEditor :: forall m. MonadAff m => MonadEffect m => State -> H.ComponentHTML Action Slots m
 renderSGFEditor state = do
   let
     value = show (state.editColor)
@@ -145,63 +162,75 @@ renderSGFEditor state = do
         , HE.onMouseMove \e -> Just $ MouseMove e
         , HE.onMouseLeave \e -> Just ClearSelection
         ]
+
+    editor =
+      [ HH.p_
+          [ HH.text ("Selection state: " <> value <> " " <> state.message) ]
+      , HH.div
+          [ HP.class_ (ClassName "row") ]
+          [ HH.div
+              [ HP.class_ (ClassName "col-2") ]
+              [ HH.span
+                  [ HP.class_ (ClassName "float-right") ]
+                  [ mkCanvas "black" SelectBlackStone
+                  , mkCanvas "white" SelectWhiteStone
+                  , mkCanvas "clear" SelectClearStone
+                  ]
+              ]
+          , HH.div
+              [ HP.class_ (ClassName "col") ]
+              [ mkBoard
+              , renderMignature (show boardSize' <> "px") (Baduk.save state.game)
+              , HH.div_
+                  [ HH.text "Name: "
+                  , HH.input
+                      [ HP.value state.game.name
+                      , HE.onValueInput (Just <<< ChangeName)
+                      ]
+                  ]
+              , HH.div_
+                  [ HH.text "Size: "
+                  , HH.input
+                      [ HP.value (show state.game.size)
+                      , HE.onValueInput (Just <<< ChangeSize)
+                      ]
+                  ]
+              , HH.div_
+                  [ HH.text "Komi: "
+                  , HH.input
+                      [ HP.value (show state.game.komi)
+                      , HE.onValueInput (Just <<< ChangeKomi)
+                      ]
+                  ]
+              , HH.div_
+                  [ HH.text "Starting player: "
+                  , HH.text (show state.game.startingPlayer)
+                  ]
+              , HH.div_
+                  [ HH.a
+                      [ HP.class_ (ClassName "btn btn-primary"), HE.onClick \s -> Just $ Save ]
+                      [ HH.text "Save" ]
+                  , HH.a
+                      [ HP.class_ (ClassName "btn btn-secondary"), HE.onClick \s -> Just $ Cancel ]
+                      [ HH.text "Cancel" ]
+                  , HH.a
+                      [ HP.class_ (ClassName "btn btn-info"), HE.onClick \s -> Just $ TestGame ]
+                      [ HH.text "Test" ]
+                  ]
+              ]
+          ]
+      ]
+
+    body = case state.mode of
+      Edit -> editor
+      Test -> [ HH.slot player unit Player.component { game: state.game, gnugo: state.gnugo } (Just <<< Resume) ]
   HH.div
     [ HP.class_ (ClassName "container") ]
-    [ HH.h1_
-        [ HH.text "Game board editor" ]
-    , HH.p_
-        [ HH.text ("Selection state: " <> value <> " " <> state.message) ]
-    , HH.div
-        [ HP.class_ (ClassName "row") ]
-        [ HH.div
-            [ HP.class_ (ClassName "col-2") ]
-            [ HH.span
-                [ HP.class_ (ClassName "float-right") ]
-                [ mkCanvas "black" SelectBlackStone
-                , mkCanvas "white" SelectWhiteStone
-                , mkCanvas "clear" SelectClearStone
-                ]
-            ]
-        , HH.div
-            [ HP.class_ (ClassName "col") ]
-            [ mkBoard
-            , renderMignature (show boardSize' <> "px") (Baduk.save state.game)
-            , HH.div_
-                [ HH.text "Name: "
-                , HH.input
-                    [ HP.value state.game.name
-                    , HE.onValueInput (Just <<< ChangeName)
-                    ]
-                ]
-            , HH.div_
-                [ HH.text "Size: "
-                , HH.input
-                    [ HP.value (show state.game.size)
-                    , HE.onValueInput (Just <<< ChangeSize)
-                    ]
-                ]
-            , HH.div_
-                [ HH.text "Komi: "
-                , HH.input
-                    [ HP.value (show state.game.komi)
-                    , HE.onValueInput (Just <<< ChangeKomi)
-                    ]
-                ]
-            , HH.div_
-                [ HH.text "Starting player: "
-                , HH.text (show state.game.startingPlayer)
-                ]
-            , HH.div_
-                [ HH.a
-                    [ HP.class_ (ClassName "btn btn-primary"), HE.onClick \s -> Just $ Save ]
-                    [ HH.text "Save" ]
-                , HH.a
-                    [ HP.class_ (ClassName "btn btn-secondary"), HE.onClick \s -> Just $ Cancel ]
-                    [ HH.text "Cancel" ]
-                ]
-            ]
-        ]
-    ]
+    ( [ HH.h1_
+          [ HH.text "Game board editor" ]
+      ]
+        <> body
+    )
 
 -- Update
 data Action
@@ -215,12 +244,18 @@ data Action
   | ChangeKomi String
   | ChangeSize String
   | ClearSelection
+  | Resume (Maybe Result)
+  | TestGame
   | Save
   | Cancel
 
-handleSGFEditorAction :: forall m. MonadEffect m => Action -> H.HalogenM State Action () Output m Unit
+handleSGFEditorAction :: forall m. MonadAff m => MonadEffect m => Action -> H.HalogenM State Action Slots Output m Unit
 handleSGFEditorAction = case _ of
   Initialize -> drawCanvases
+  TestGame -> H.modify_ \s -> s { mode = Test }
+  Resume _ -> do
+    H.modify_ \s -> s { mode = Edit }
+    drawCanvases
   SelectBlackStone -> do
     H.modify_ \s -> s { editColor = AddBlackStone, game = s.game { startingPlayer = Black } }
     drawCanvases
