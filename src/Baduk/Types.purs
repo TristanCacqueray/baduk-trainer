@@ -17,6 +17,13 @@ data Stone
 data Capture
   = Capture Int (List Coord)
 
+data PlayerMove
+  = PlaceStone Coord
+  | Pass
+
+data Move
+  = Move Color PlayerMove
+
 data Result
   = Win
   | Loss
@@ -27,6 +34,13 @@ instance showResult :: Show Result where
 
 instance showPoint :: Show Coord where
   show (Coord x y) = "(Coord " <> show x <> " " <> show y <> ")"
+
+instance showPlayerMove :: Show PlayerMove where
+  show (PlaceStone coord) = "(PlaceStone " <> show coord <> ")"
+  show Pass = "Pass"
+
+instance showMove :: Show Move where
+  show (Move color pm) = "(Move " <> show color <> " " <> show pm <> ")"
 
 instance showCapture :: Show Capture where
   show (Capture p xs) = "(Capture " <> show p <> " " <> show xs <> ")"
@@ -48,12 +62,16 @@ derive instance eqCoord :: Eq Coord
 
 derive instance ordCoord :: Ord Coord
 
+derive instance eqMove :: Eq PlayerMove
+
+derive instance ordMove :: Ord PlayerMove
+
 derive instance eqStone :: Eq Stone
 
 derive instance ordStone :: Ord Stone
 
 type Player
-  = { stones :: List Coord, moves :: List Coord, captures :: List Capture }
+  = { stones :: List Coord, moves :: List PlayerMove, captures :: List Capture }
 
 initPlayer :: Player
 initPlayer = { stones: Nil, moves: Nil, captures: Nil }

@@ -1,7 +1,7 @@
 -- | Convertion functions for the Baduk Game type
 module Baduk.Converter (load, save, showBoard, readBoard) where
 
-import Baduk.Types (Coord(..), Game, getPlayer, Position(..), Stone(..), initGame)
+import Baduk.Types (Coord(..), Game, Move(..), PlayerMove(..), Position(..), Stone(..), getPlayer, initGame)
 import Control.Monad.Except (ExceptT, runExceptT, throwError)
 import Control.Monad.State (StateT, execStateT, get, modify)
 import Control.Monad.Writer (WriterT, runWriterT, tell)
@@ -19,7 +19,7 @@ import Data.Newtype (unwrap)
 import Data.String (CodePoint, codePointFromChar, length, null, toCodePointArray)
 import Data.String.CodeUnits (singleton)
 import Data.Traversable (for)
-import Data.Tuple (Tuple(..))
+import Data.Tuple (Tuple)
 import Prelude
 import SGF (Color(..), FlatSGF, Property(..), SGF, Value(..), flatten, inverseColor)
 
@@ -59,15 +59,18 @@ loader fsgf = case onlyHead fsgf of
 
   go (Prop name _) = tell [ "Unknown property " <> name ] *> get
 
+  addMoves :: Color -> List PlayerMove -> Loader Game
+  addMoves color moves =
+    modify
+      ( \game → case color of
+          Black → game { black = game.black { moves = moves <> game.black.moves } }
+          White → game { white = game.white { moves = moves <> game.white.moves } }
+      )
+
   addStones ∷ Color → List Value → Loader Game
   addStones color vals = case for vals valPoint of
-    Just points →
-      modify
-        ( \game → case color of
-            Black → game { black = game.black { moves = points <> game.black.moves } }
-            White → game { white = game.white { moves = points <> game.white.moves } }
-        )
-    Nothing → throwError ("Invalid moves value for " <> show color)
+    Just points → addMoves color (map PlaceStone points)
+    Nothing → addMoves color (Pass : Nil)
 
   setStones ∷ Color → List Value → Loader Game
   setStones color vals = case for vals valPoint of
@@ -114,10 +117,15 @@ save g =
       (map showPlayedPos allStonePlayed)
       <> L.intercalate "" (replicate (L.length allStonePlayed - 1) ")")
 
-  showPlayedPos :: Tuple Color Coord -> String
-  showPlayedPos (Tuple color coord) = show color <> saveCoord coord
+  showPlayedPos :: Move -> String
+  showPlayedPos (Move color move) =
+    show color
+      <> ( case move of
+            PlaceStone coord -> saveCoord coord
+            Pass -> "[]"
+        )
 
-  allStonePlayed :: List (Tuple Color Coord)
+  allStonePlayed :: List Move
   allStonePlayed = L.reverse $ interleave starting opponent
 
   interleave :: forall a. List a -> List a -> List a
@@ -127,11 +135,11 @@ save g =
 
   interleave _ _ = Nil
 
-  starting :: List (Tuple Color Coord)
-  starting = map (Tuple g.startingPlayer) (getPlayer g g.startingPlayer).moves
+  starting :: List Move
+  starting = map (Move g.startingPlayer) (getPlayer g g.startingPlayer).moves
 
-  opponent :: List (Tuple Color Coord)
-  opponent = map (Tuple (inverseColor g.startingPlayer)) (getPlayer g (inverseColor g.startingPlayer)).moves
+  opponent :: List Move
+  opponent = map (Move (inverseColor g.startingPlayer)) (getPlayer g (inverseColor g.startingPlayer)).moves
 
 coordToIdx ∷ Int → Coord → Int
 coordToIdx sz (Coord cx cy) = cx + cy * sz
@@ -173,8 +181,8 @@ getBoard game@{ size: size, black: bplayer, white: wplayer } = reverse (create (
   create n = createCell (idxToCoord size n) `cons` create (n - 1)
 
   createCell coord
-    | coord `elem` bplayer.stones || coord `elem` bplayer.moves = Occupied Black
-    | coord `elem` wplayer.stones || coord `elem` wplayer.moves = Occupied White
+    | coord `elem` bplayer.stones || (PlaceStone coord) `elem` bplayer.moves = Occupied Black
+    | coord `elem` wplayer.stones || (PlaceStone coord) `elem` wplayer.moves = Occupied White
     | otherwise = Empty
 
 showBoard :: Game -> String

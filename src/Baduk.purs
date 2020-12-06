@@ -7,8 +7,8 @@ module Baduk
   ) where
 
 import Baduk.Converter (load, save)
-import Baduk.Types (Game, Coord(..), Stone(..), Result(..), initGame, initPlayer)
-import Baduk.Game (initAliveStones, getLastMove, addStone, setStone, removeStone)
+import Baduk.Types (Game, Coord(..), Stone(..), Result(..), Move(..), initGame, initPlayer)
+import Baduk.Game (initAliveStones, getLastMove, addMove, addStone, setStone, removeStone)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
 import Data.Tuple (Tuple(..))

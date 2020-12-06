@@ -4,7 +4,7 @@ import Baduk (loadBaduk)
 import Baduk as Baduk
 import Baduk.Converter (load, showBoard, readBoard)
 import Baduk.Game (addStone)
-import Baduk.Types (Coord(..), Stone(..), initGame, showGame)
+import Baduk.Types (Coord(..), PlayerMove(..), Stone(..), initGame, showGame)
 import Control.Monad.Error.Class (class MonadThrow, throwError)
 import Data.Array (concat, intercalate)
 import Data.Array as A
@@ -20,6 +20,7 @@ import Effect.Aff (launchAff_)
 import Effect.Exception (Error, error)
 import Prelude (Unit, discard, pure, show, unit, ($), (<>), (==), (/=), bind)
 import SGF (Color(..), GameTree(..), Property(..), SGF, Sequence, Value(..), parse)
+import SGF as SGF
 import Test.Spec (describe, it)
 import Test.Spec.Reporter.Console (consoleReporter)
 import Test.Spec.Runner (runSpec)
@@ -73,7 +74,7 @@ checkParser valid expr = do
 
 goodExprs :: Array String
 goodExprs =
-  [ "(;G[1]B[01])"
+  [ "(;G[1]B[01]W[])"
   , "(;GM[1]SZ[5]KM[3.5]AB[cb][bc]AW[cd][dd][ed]PL[B];B[bd])"
   , "(;G[]B[11](;N[42]))"
   ]
@@ -92,6 +93,7 @@ main =
           describe "Parser" $ sequence_ parserTests
           describe "Converter" do
             it "load demo sgf" (checkLoader sampleSGF)
+            it "load game" checkLoadGame
             it "print game" checkShowGame
             it "save game" checkSaveGame
           describe "Game" $ sequence_ playTests
@@ -187,8 +189,8 @@ main =
 
   testGame =
     initGame
-      { black = initGame.black { moves = Cons (Coord 1 1) (Cons (Coord 1 2) Nil) }
-      , white = initGame.white { moves = Cons (Coord 4 1) (Cons (Coord 4 2) Nil) }
+      { black = initGame.black { moves = map PlaceStone $ Cons (Coord 1 1) (Cons (Coord 1 2) Nil) }
+      , white = initGame.white { moves = map PlaceStone $ Cons (Coord 4 1) (Cons (Coord 4 2) Nil) }
       }
 
   testStr =
@@ -196,6 +198,12 @@ main =
       [ "(;SZ[19]PL[B]"
       , ";W[ec](;B[bc](;W[eb](;B[bb]))))"
       ]
+
+  checkLoadGame = case SGF.parse "(;B[])" of
+    Right sgf -> case Baduk.load sgf of
+      Right _ -> pure unit
+      Left e -> throwError (error $ show e)
+    Left e -> throwError (error $ show e)
 
   checkSaveGame :: forall m. MonadThrow Error m => m Unit
   checkSaveGame =

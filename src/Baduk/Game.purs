@@ -1,7 +1,7 @@
 -- | Baduk game logic
-module Baduk.Game (addStone, initAliveStones, getLastMove, setStone, removeStone) where
+module Baduk.Game (addMove, addStone, initAliveStones, getLastMove, setStone, removeStone) where
 
-import Baduk.Types (Capture(..), Coord(..), Game, Player, Stone(..), getPlayer)
+import Baduk.Types (Capture(..), Coord(..), Game, Player, PlayerMove(..), Stone(..), Move(..), getPlayer)
 import Data.Foldable (find)
 import Data.List (List(..), elem, filter, head, length, nub, snoc, (:))
 import Data.List as Data.List
@@ -103,21 +103,21 @@ isValidMove (Stone color coord) game = alive && not ko
   -- TODO ko test
   ko = false
 
-lastStone :: Color -> List Coord -> Maybe Stone
-lastStone color l = case head l of
-  Just coord -> Just $ Stone color coord
+lastMove :: Color -> List PlayerMove -> Maybe Move
+lastMove color l = case head l of
+  Just move' -> Just $ Move color move'
   Nothing -> Nothing
 
 -- | Get last move
-getLastMove :: Game -> Maybe Stone
+getLastMove :: Game -> Maybe Move
 getLastMove game
-  | length game.black.moves > length game.white.moves = lastStone Black game.black.moves
-  | length game.black.moves < length game.white.moves = lastStone White game.white.moves
+  | length game.black.moves > length game.white.moves = lastMove Black game.black.moves
+  | length game.black.moves < length game.white.moves = lastMove White game.white.moves
   | otherwise =
     let
       oponent = inverseColor game.startingPlayer
     in
-      lastStone oponent (getPlayer game oponent).moves
+      lastMove oponent (getPlayer game oponent).moves
 
 addStone ∷ Stone -> Game → Maybe Game
 addStone stone@(Stone color coord) game =
@@ -134,7 +134,7 @@ addStone stone@(Stone color coord) game =
   updatePlayer :: Player -> Player
   updatePlayer p =
     p
-      { moves = coord : p.moves
+      { moves = PlaceStone coord : p.moves
       , captures =
         if Data.List.null captures then
           p.captures
@@ -145,6 +145,15 @@ addStone stone@(Stone color coord) game =
   doAddStone g = case stone of
     Stone Black _ -> g { black = updatePlayer g.black }
     Stone White _ -> g { white = updatePlayer g.white }
+
+addMove :: Move -> Game -> Maybe Game
+addMove (Move color move') g = case move' of
+  PlaceStone coord -> addStone (Stone color coord) g
+  Pass ->
+    Just
+      $ case color of
+          Black -> g { black = g.black { moves = Pass : g.black.moves } }
+          White -> g { white = g.white { moves = Pass : g.white.moves } }
 
 setPlayerStone :: Player -> Coord -> Player
 setPlayerStone p c = p { stones = snoc p.stones c }

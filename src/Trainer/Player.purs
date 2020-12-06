@@ -1,7 +1,8 @@
 module Trainer.Player (Input, Slot, Output, component) where
 
 import Prelude
-import Baduk (Coord, Stone(..), Game, Result(..), addStone, getLastMove, loadBaduk, save, initAliveStones)
+import Baduk (Coord, Game, Move(..), Result(..), addMove, getLastMove, initAliveStones, loadBaduk, save)
+import Baduk.Types (PlayerMove(..))
 import Data.List (List(..), length)
 import Data.Maybe (Maybe(..))
 import Data.Time.Duration (Milliseconds(..))
@@ -64,7 +65,7 @@ initialState input =
   }
 
 data Action
-  = Pass
+  = DoPass
   | Resign
   | Restart
   | AddStone MouseEvent
@@ -121,7 +122,7 @@ render state =
               [ board, infos ]
           , HH.div_
               [ HH.a
-                  [ HP.class_ (ClassName "btn btn-primary"), HE.onClick \s -> Just $ Pass ]
+                  [ HP.class_ (ClassName "btn btn-primary"), HE.onClick \s -> Just $ DoPass ]
                   [ HH.text "Pass" ]
               , HH.a
                   [ HP.class_ (ClassName "btn btn-secondary"), HE.onClick \s -> Just $ Restart ]
@@ -148,7 +149,7 @@ aiPlay gnugo game = do
       case getLastMove g of
         Just move -> do
           log ("adding: " <> show move)
-          case addStone move game of
+          case addMove move game of
             Just newGame -> pure newGame
             Nothing -> do
               log ("No new-move?!")
@@ -185,7 +186,7 @@ handleAction = case _ of
     state <- H.get
     case state.editCoord of
       Nothing -> pure unit
-      Just coord -> case addStone (Stone state.game.startingPlayer coord) state.game of
+      Just coord -> case addMove (Move state.game.startingPlayer (PlaceStone coord)) state.game of
         Just newGame -> do
           H.modify_ \s -> s { game = newGame, status = WaitingAI }
           drawBoard
