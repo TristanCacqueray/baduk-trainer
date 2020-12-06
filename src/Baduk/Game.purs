@@ -1,5 +1,5 @@
 -- | Baduk game logic
-module Baduk.Game (addMove, addStone, initAliveStones, getLastMove, setStone, removeStone) where
+module Baduk.Game (addMove, addStone, initAliveStones, isCompleted, getLastMove, setStone, removeStone) where
 
 import Baduk.Types (Capture(..), Coord(..), Game, Player, PlayerMove(..), Stone(..), Move(..), getPlayer)
 import Data.Foldable (find)
@@ -16,6 +16,13 @@ initAliveStones game = game { stonesAlive = blackStones <> whiteStones }
   blackStones = map (Stone Black) game.black.stones
 
   whiteStones = map (Stone White) game.white.stones
+
+isCompleted :: Game -> Boolean
+isCompleted g = hasPassed g.black && hasPassed g.white
+  where
+  hasPassed player = case player.moves of
+    Pass : _ -> true
+    _ -> false
 
 type Size
   = Int

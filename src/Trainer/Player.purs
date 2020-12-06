@@ -182,39 +182,46 @@ handleAction = case _ of
             case mCoord of
               Nothing -> pure unit
               Just _ -> drawBoard
+  MouseLeave -> do
+    H.modify_ \s -> s { editCoord = Nothing }
+    drawBoard
   AddStone e -> do
     state <- H.get
     case state.editCoord of
       Nothing -> pure unit
-      Just coord -> case addMove (Move state.game.startingPlayer (PlaceStone coord)) state.game of
-        Just newGame -> do
-          H.modify_ \s -> s { game = newGame, status = WaitingAI }
-          drawBoard
-          _ <- do
-            H.fork do
-              -- This delay seems to help halogen render the waiting ai message
-              -- Otherwise it skip the update and only show waiting for humang again
-              -- as if wasm is freezing the rendering loop
-              H.liftAff (delay $ Milliseconds 10.0)
-              newGame' <- case state.gnugo of
-                Nothing -> do
-                  H.liftAff (delay $ Milliseconds 1000.0)
-                  -- Fake a move
-                  pure newGame
-                Just gnugo -> do
-                  g <- H.liftAff $ liftEffect $ aiPlay gnugo newGame
-                  pure g
-              H.modify_ \s -> s { game = newGame', status = WaitingHuman }
-              drawBoard
-          pure unit
-        Nothing -> do
-          liftEffect $ log "Invalid move"
-          pure unit
-  MouseLeave -> do
-    H.modify_ \s -> s { editCoord = Nothing }
-    drawBoard
-  _ -> pure unit
+      Just coord -> play (PlaceStone coord) state
+  DoPass -> H.get >>= play Pass
   where
+  play :: PlayerMove -> State -> H.HalogenM State Action () Output m Unit
+  play move state = case addMove (Move state.game.startingPlayer move) state.game of
+    Just newGame -> do
+      playAi state.gnugo newGame
+    Nothing -> do
+      liftEffect $ log "Invalid move"
+      pure unit
+
+  playAi :: Maybe GnuGO.WASM -> Game -> H.HalogenM State Action () Output m Unit
+  playAi gnugo' game = do
+    H.modify_ \s -> s { game = game, status = WaitingAI }
+    drawBoard
+    _ <- do
+      H.fork do
+        -- This delay seems to help halogen render the waiting ai message
+        -- Otherwise it skip the update and only show waiting for humang again
+        -- as if wasm is freezing the rendering loop
+        H.liftAff (delay $ Milliseconds 10.0)
+        newGame' <- case gnugo' of
+          Nothing -> do
+            H.liftAff (delay $ Milliseconds 1000.0)
+            -- Fake a move
+            pure game
+          Just gnugo -> do
+            g <- H.liftAff $ liftEffect $ aiPlay gnugo game
+            pure g
+        H.modify_ \s -> s { game = newGame', status = WaitingHuman }
+        drawBoard
+    pure unit
+
   drawBoard = do
     state <- H.get
     liftEffect do
