@@ -6,6 +6,21 @@ A web application to learn the game of [baduk][baduk] using [gnugo][gnugo].
 
 Go to the [website](https://tristancacqueray.github.io/baduk-trainer/) and play the training games.
 
+## Features
+
+- Trainer
+  - [x] game list
+  - [ ] save state in local storage
+  - [ ] export
+- Editor
+  - [x] stones
+  - [x] name, size, komi
+  - [ ] rank estimator
+- Player
+  - [x] basic captures
+  - [ ] ko
+  - [ ] property testing
+
 ## Contribute
 
 ### Requirements

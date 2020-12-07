@@ -137,7 +137,7 @@ render :: forall m. MonadAff m => MonadEffect m => State -> H.ComponentHTML Acti
 render state =
   HH.div
     [ HP.class_ (ClassName "container") ]
-    (nav <> body)
+    (nav <> info <> body)
   --    (toUnfoldable $ map (\game -> HH.slot editor 0 Editor.component { game } absurd) state.games)
   where
   nav =
@@ -150,6 +150,17 @@ render state =
                 [ HP.class_ (ClassName ("nav-link" <> homeNavClass state.mode)), clk ShowGames, HP.href "#" ]
                 [ HH.text "Home" ]
             ]
+        ]
+    ]
+
+  info =
+    [ HH.div
+        [ HP.class_ (ClassName "alert alert-warning") ]
+        [ HH.text ("This application is currently alpha, play-mode is ")
+        , HH.a [ HP.href "https://github.com/TristanCacqueray/baduk-trainer#features" ] [ HH.text "incomplete" ]
+        , HH.text (". Checkout the ")
+        , HH.a [ HP.href "https://senseis.xmp.net/?RulesOfGoIntroductory" ] [ HH.text "rules of baduk" ]
+        , HH.text (" to learn the basics first.")
         ]
     ]
 
