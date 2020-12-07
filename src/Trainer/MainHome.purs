@@ -1,7 +1,7 @@
 module Trainer.MainHome (component) where
 
 import Prelude
-import Baduk (Result, Game, loadBaduk)
+import Baduk (Game, Result(..), loadBaduk)
 import Data.List (List(..), catMaybes, mapWithIndex, toUnfoldable, zipWith)
 import Data.Maybe (Maybe(..))
 import Data.Symbol (SProxy(..))
@@ -44,7 +44,7 @@ data Mode
 data Action
   = SwitchMode Mode
   | Edited Int (Maybe String)
-  | Played Int (Maybe Result)
+  | Played Int String (Maybe Result)
   | Initialize
 
 isHome :: Mode -> Boolean
@@ -61,6 +61,7 @@ type TrainingGame
   = { sgf :: String
     , game :: Game
     , id :: String
+    , completed :: Boolean
     }
 
 type State
@@ -74,18 +75,20 @@ component =
     , eval: H.mkEval $ H.defaultEval { handleAction = handleAction, initialize = Just Initialize }
     }
 
-mkTrainingGames :: forall id. Show id => id -> String -> Maybe TrainingGame
-mkTrainingGames idx sgf = case loadBaduk sgf of
-  Just game -> Just { sgf, game, id: "train-" <> show idx }
+mkTrainingGames :: forall id. Show id => Boolean -> id -> String -> Maybe TrainingGame
+mkTrainingGames completed idx sgf = case loadBaduk sgf of
+  Just game -> Just { sgf, game, completed, id: "train-" <> show idx }
   _ -> Nothing
 
 initialState :: Input -> State
 initialState { trainingGames, gnugo } = { trainingGames: games, gnugo, mode: ShowGames }
   where
-  games = catMaybes (mapWithIndex mkTrainingGames trainingGames)
+  games = catMaybes (mapWithIndex (mkTrainingGames false) trainingGames)
 
-replaceGame :: Int -> TrainingGame -> List TrainingGame -> List TrainingGame
-replaceGame idx tg = go 0
+replaceGame :: Int -> Maybe TrainingGame -> List TrainingGame -> List TrainingGame
+replaceGame _ Nothing l = l
+
+replaceGame idx (Just tg) l = go 0 l
   where
   go :: Int -> List TrainingGame -> List TrainingGame
   go n = case _ of
@@ -99,14 +102,19 @@ handleAction = case _ of
     state <- H.get
     let
       newGames = case maybeGame of
-        Just g -> case mkTrainingGames idx g of
-          Just g' -> replaceGame idx g' state.trainingGames
+        Just g -> case mkTrainingGames false idx g of
+          Just g' -> replaceGame idx (Just g') state.trainingGames
           Nothing -> state.trainingGames
         Nothing -> state.trainingGames
     (H.modify \s -> s { trainingGames = newGames, mode = ShowGames }) >>= redraw
-  Played idx maybeResult -> do
+  Played idx gameSgf maybeResult -> do
     liftEffect $ log ("Played " <> show idx <> " : " <> show maybeResult)
-    (H.modify \s -> s { mode = ShowGames }) >>= redraw
+    state <- H.get
+    let
+      trainingGames = case maybeResult of
+        Just Win -> replaceGame idx (mkTrainingGames true idx gameSgf) state.trainingGames
+        _ -> state.trainingGames
+    (H.modify \s -> s { mode = ShowGames, trainingGames = trainingGames }) >>= redraw
   Initialize -> H.get >>= redraw
   where
   redraw state =
@@ -155,7 +163,7 @@ render state =
       ]
     EditGame n s -> [ HH.slot editor unit Editor.component { sgfStr: s, gnugo: state.gnugo } (Just <<< Edited n) ]
     PlayGame n s -> case loadBaduk s of
-      Just g -> [ HH.slot player unit Player.component { game: g, gnugo: state.gnugo } (Just <<< Played n) ]
+      Just g -> [ HH.slot player unit Player.component { game: g, gnugo: state.gnugo } (Just <<< Played n s) ]
       Nothing -> [ HH.text ("Invalid game: " <> s) ]
 
   clk mode = HE.onClick \e -> Just (SwitchMode mode)
@@ -180,10 +188,10 @@ render state =
           , HH.div
               [ HP.class_ (ClassName "row") ]
               [ HH.a
-                  [ HP.class_ (ClassName "btn btn-primary")
+                  [ HP.class_ (ClassName ("btn btn-" <> if tg.completed then "success" else "primary"))
                   , clk (PlayGame idx tg.sgf)
                   ]
-                  [ HH.text "play" ]
+                  [ HH.text (if tg.completed then "replay" else "play") ]
               , HH.a
                   [ HP.class_ (ClassName "btn btn-secondary")
                   , clk (EditGame idx tg.sgf)
