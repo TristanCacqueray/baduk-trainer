@@ -7,6 +7,7 @@ module Baduk.Game
   , getLastMove
   , setStone
   , removeStone
+  , getStone
   -- Export for debugging purpose
   , removeDeadStones
   , getGroup
@@ -34,6 +35,15 @@ isCompleted g = hasPassed g.black && hasPassed g.white
   hasPassed player = case player.moves of
     Pass : _ -> true
     _ -> false
+
+getStone :: Coord -> Game -> Maybe Stone
+getStone coord game = case game.stonesAlive of
+  Nil -> case elem coord game.black.stones of
+    true -> Just (Stone Black coord)
+    false -> case elem coord game.white.stones of
+      true -> Just (Stone White coord)
+      false -> Nothing
+  xs -> find (\(Stone color coord') -> coord' == coord) xs
 
 type Size
   = Int

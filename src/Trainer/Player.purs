@@ -1,7 +1,7 @@
 module Trainer.Player (Input, Slot, Output, component) where
 
 import Prelude
-import Baduk (Coord, Game, Color(..), Move(..), Result(..), addMove, getLastMove, initAliveStones, isCompleted, loadBaduk, save)
+import Baduk (Coord, Game, Color(..), Move(..), Result(..), addMove, getLastMove, initAliveStones, isCompleted, loadBaduk, save, getStone)
 import Baduk.Types (PlayerMove(..))
 import Data.List (List(..), length)
 import Data.Maybe (Maybe(..))
@@ -236,7 +236,9 @@ handleAction = case _ of
     state <- H.get
     case state.editCoord of
       Nothing -> pure unit
-      Just coord -> play (PlaceStone coord) state
+      Just coord -> case getStone coord state.game of
+        Nothing -> play (PlaceStone coord) state
+        Just _ -> pure unit
   DoPass -> H.get >>= play Pass
   where
   moveMouse state e = do

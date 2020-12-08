@@ -300,7 +300,9 @@ handleSGFEditorAction = case _ of
     case state.editPos of
       Just (Tuple coord color') -> do
         case color' of
-          Just color -> H.modify_ \s -> s { game = Baduk.setStone state.game coord color }
+          Just color -> case (Baduk.getStone coord state.game) of
+            Nothing -> H.modify_ \s -> s { game = Baduk.setStone state.game coord color }
+            Just _ -> pure unit
           Nothing -> H.modify_ \s -> s { game = Baduk.removeStone state.game coord }
         drawCanvases
       Nothing -> pure unit
