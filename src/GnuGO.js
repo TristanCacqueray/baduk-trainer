@@ -1,9 +1,9 @@
 "use strict";
 
-let loader = require("../../../wasm-gnugo/javascript/loader.js");
+let loader = require("../../../wasm-gnugo/javascript/gnugo.js");
 
 exports.withWasmU = (wasmURL, callback) => () => {
-  loader.load(wasmURL, callback)
+  loader.withWasm(wasmURL, callback)
 };
 
 exports.playU = function (module, seed, gameStr) {
