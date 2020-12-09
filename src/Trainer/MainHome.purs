@@ -137,7 +137,7 @@ render :: forall m. MonadAff m => MonadEffect m => State -> H.ComponentHTML Acti
 render state =
   HH.div
     [ HP.class_ (ClassName "container") ]
-    (nav <> info <> body)
+    (nav <> body)
   --    (toUnfoldable $ map (\game -> HH.slot editor 0 Editor.component { game } absurd) state.games)
   where
   nav =
@@ -154,19 +154,19 @@ render state =
     ]
 
   info =
-    [ HH.div
-        [ HP.class_ (ClassName "alert alert-warning") ]
-        [ HH.text ("This application is currently alpha, play-mode is ")
-        , HH.a [ HP.href "https://github.com/TristanCacqueray/baduk-trainer#features" ] [ HH.text "incomplete" ]
-        , HH.text (". Checkout the ")
-        , HH.a [ HP.href "https://senseis.xmp.net/?RulesOfGoIntroductory" ] [ HH.text "rules of baduk" ]
-        , HH.text (" to learn the basics first.")
-        ]
-    ]
+    HH.div
+      [ HP.class_ (ClassName "alert alert-warning") ]
+      [ HH.text ("This application is currently beta, some features are ")
+      , HH.a [ HP.href "https://github.com/TristanCacqueray/baduk-trainer#features" ] [ HH.text "missing" ]
+      , HH.text (". Checkout the ")
+      , HH.a [ HP.href "https://senseis.xmp.net/?RulesOfGoIntroductory" ] [ HH.text "rules of baduk" ]
+      , HH.text (" to learn the basics first.")
+      ]
 
   body = case state.mode of
     ShowGames ->
-      [ HH.h1_
+      [ info
+      , HH.h1_
           [ HH.text "Select a training game" ]
       , HH.div
           [ HP.class_ (ClassName "row") ]
