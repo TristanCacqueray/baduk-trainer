@@ -14,6 +14,10 @@ defaultGames :: List String
 defaultGames =
   "(;GN[Capture]SZ[5]PL[B];AB[bb][db][bd][ac][dd][ec];AW[bc][dc];)"
     : "(;GN[Intro]SZ[6]PL[B];AB[bb][db][bd][cc];AW[bc][ee];)"
+    -- Simple ko testing game
+
+    -- : "(;GN[TestKo]SZ[5]KM[6.5]PL[B];AB[bc][ac][cb][dc][ec][bb][db];AW[cc][bd][ad][dd][ed][ce];)"
+
     : "(;GN[Five]SZ[5]PL[B];AB[cc];)"
     : "(;GN[Six]SZ[6]PL[B];AB[eb][be];))"
     : "(;GN[Test]SZ[6]PL[B]KM[2.5];AB[bb][eb][be][bd][bc][bf][cb][db][fb][aa];AW[cd][dc][ed][de][ce][cf][ec][fc][cc];)"

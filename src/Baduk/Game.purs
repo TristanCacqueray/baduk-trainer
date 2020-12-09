@@ -13,12 +13,12 @@ module Baduk.Game
   , getGroup
   ) where
 
+import Prelude
 import Baduk.Types (Capture(..), Coord(..), Game, Player, PlayerMove(..), Stone(..), Move(..), getPlayer)
 import Data.Foldable (find)
-import Data.List (List(..), elem, filter, head, length, nub, snoc, (:))
+import Data.List (List(..), elem, filter, head, last, length, nub, snoc, (:))
 import Data.List as Data.List
 import Data.Maybe (Maybe(..))
-import Prelude
 import SGF (Color(..), inverseColor)
 
 -- | Initial board when the game start
@@ -120,6 +120,11 @@ removeDeadStones sz xs coord = filter isAlive xs
     | otherwise = Nil
 
 -- | Check if a stone can be played
+getOpponent :: Color -> Game -> Player
+getOpponent color game = case color of
+  Black -> game.white
+  White -> game.black
+
 isValidMove :: Stone -> Game -> Boolean
 isValidMove (Stone color coord) game = alive && not ko
   where
@@ -127,8 +132,9 @@ isValidMove (Stone color coord) game = alive && not ko
     Just group -> group.liberties /= Nil
     Nothing -> false
 
-  -- TODO ko test
-  ko = false
+  ko = case last ((getOpponent color game).captures) of
+    Just (Capture captureMove (captureCoord : Nil)) -> captureMove == game.move - 1 && captureCoord == coord
+    _ -> false
 
 lastMove :: Color -> List PlayerMove -> Maybe Move
 lastMove color l = case head l of
@@ -170,8 +176,8 @@ addStone stone@(Stone color coord) game =
       }
 
   doAddStone g = case stone of
-    Stone Black _ -> g { black = updatePlayer g.black }
-    Stone White _ -> g { white = updatePlayer g.white }
+    Stone Black _ -> g { black = updatePlayer g.black, move = game.move + 1 }
+    Stone White _ -> g { white = updatePlayer g.white, move = game.move + 1 }
 
 addMove :: Move -> Game -> Maybe Game
 addMove (Move color move') g = case move' of

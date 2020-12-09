@@ -11,14 +11,14 @@ Go to the [website](https://tristancacqueray.github.io/baduk-trainer/) and play 
 - Trainer
   - [x] game list
   - [ ] save state in local storage
-  - [ ] export
+  - [ ] display progressive game list
 - Editor
   - [x] stones
   - [x] name, size, komi
   - [ ] rank estimator
 - Player
   - [x] basic captures
-  - [ ] ko
+  - [x] ko
   - [ ] property testing
 
 ## Contribute
