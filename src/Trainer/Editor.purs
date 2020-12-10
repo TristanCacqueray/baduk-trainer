@@ -227,7 +227,7 @@ renderSGFEditor state = do
   HH.div
     [ HP.class_ (ClassName "container") ]
     ( [ HH.h1_
-          [ HH.text "Game board editor" ]
+          [ HH.text "Editor" ]
       ]
         <> body
     )

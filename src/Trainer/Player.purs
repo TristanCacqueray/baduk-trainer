@@ -150,9 +150,7 @@ render state =
   in
     HH.div
       [ HP.class_ (ClassName "container") ]
-      [ HH.h1_
-          [ HH.text "Baduk Trainer" ]
-      , HH.h4_
+      [ HH.h4_
           [ HH.text ("Playing: " <> state.game.name) ]
       , HH.p_
           [ HH.text ("Status: " <> message) ]
