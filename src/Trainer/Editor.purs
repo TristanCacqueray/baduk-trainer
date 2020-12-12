@@ -36,7 +36,7 @@ import Web.UIEvent.MouseEvent (MouseEvent)
 
 type Input
   = { sgfStr :: String
-    , gnugo :: Maybe GnuGO.WASM
+    , gnugo :: GnuGO.WASM
     }
 
 type Output
@@ -122,7 +122,7 @@ type State
     , message :: String
     , mode :: Mode
     , game :: Game
-    , gnugo :: Maybe GnuGO.WASM
+    , gnugo :: GnuGO.WASM
     }
 
 -- Render

@@ -11,7 +11,6 @@ import Data.Either (Either(..))
 import Data.Function.Uncurried (Fn3, runFn3)
 import Effect (Effect)
 import Effect.Aff (Aff)
-import Prelude ((<<<))
 
 foreign import data WASM :: Type
 
@@ -20,21 +19,17 @@ foreign import getP ::
     (String -> Either String WASM)
     (WASM -> Either String WASM)
     String
-    ( Effect
-        (Promise (Either String WASM))
-    )
+    (Effect (Promise (Either String WASM)))
 
-foreign import playU :: Fn3 WASM Int String String
+foreign import playU :: Fn3 WASM Int String (Effect (Promise String))
 
-foreign import scoreU :: Fn3 WASM Int String Number
+foreign import scoreU :: Fn3 WASM Int String (Effect (Promise Number))
 
 get :: String -> Aff (Either String WASM)
-get = toAffE <<< getC Left Right
-  where
-  getC = runFn3 getP
+get url = toAffE (runFn3 getP Left Right url)
 
-play :: WASM -> Int -> String -> String
-play = runFn3 playU
+play :: WASM -> Int -> String -> Aff String
+play wasm seed sgf = toAffE (runFn3 playU wasm seed sgf)
 
-score :: WASM -> Int -> String -> Number
-score = runFn3 scoreU
+score :: WASM -> Int -> String -> Aff Number
+score wasm seed sgf = toAffE (runFn3 scoreU wasm seed sgf)

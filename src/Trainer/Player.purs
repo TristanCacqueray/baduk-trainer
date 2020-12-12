@@ -5,10 +5,7 @@ import Baduk (Coord, Game, Color(..), Move(..), Result(..), addMove, getLastMove
 import Baduk.Types (PlayerMove(..))
 import Data.List (List(..), length)
 import Data.Maybe (Maybe(..))
-import Data.Time.Duration (Milliseconds(..))
 import Data.Tuple (Tuple(..))
-import Effect (Effect)
-import Effect.Aff (delay)
 import Effect.Aff.Class (class MonadAff)
 import Effect.Class (class MonadEffect)
 import Effect.Console (log)
@@ -26,7 +23,7 @@ import Web.UIEvent.MouseEvent (MouseEvent)
 
 type Input
   = { game :: Game
-    , gnugo :: Maybe GnuGO.WASM
+    , gnugo :: GnuGO.WASM
     }
 
 type Output
@@ -59,7 +56,7 @@ data Status
 
 type State
   = { initialGame :: Game
-    , gnugo :: Maybe GnuGO.WASM
+    , gnugo :: GnuGO.WASM
     , game :: Game
     , editCoord :: Maybe Coord
     , status :: Status
@@ -83,7 +80,7 @@ data Action
   | MouseLeave
   | Draw
 
-render :: forall m. MonadEffect m => State -> H.ComponentHTML Action () m
+render :: forall m. MonadAff m => State -> H.ComponentHTML Action () m
 render state =
   let
     lastMove = getLastMove state.game
@@ -171,41 +168,39 @@ render state =
           ]
       ]
 
-aiPlay :: GnuGO.WASM -> Game -> Effect Game
+aiPlay :: forall m. MonadAff m => GnuGO.WASM -> Game -> m Game
 aiPlay gnugo game = do
   let
     gameStr = save game
-  log ("sending: " <> gameStr)
-  let
-    newGameStr = GnuGO.play gnugo 0 gameStr
-  log ("received: " <> newGameStr)
+  liftEffect $ log ("sending: " <> gameStr)
+  newGameStr <- H.liftAff $ GnuGO.play gnugo 0 gameStr
+  liftEffect $ log ("received: " <> newGameStr)
   case loadBaduk newGameStr of
     -- revert starting player inversion
     Just g -> do
-      log ("loaded game: " <> show g)
+      liftEffect $ log ("loaded game: " <> show g)
       case getLastMove g of
         Just move -> do
-          log ("adding: " <> show move)
+          liftEffect $ log ("adding: " <> show move)
           case addMove move game of
             Just newGame -> pure newGame
             Nothing -> do
-              log ("No new-move?!")
+              liftEffect $ log ("No new-move?!")
               pure game
         Nothing -> do
-          log ("No move?!")
+          liftEffect $ log ("No move?!")
           pure game
     Nothing -> do
-      log ("Couldn't load")
+      liftEffect $ log ("Couldn't load")
       pure game
 
-aiScore :: GnuGO.WASM -> Game -> Effect Score
+aiScore :: forall m. MonadAff m => GnuGO.WASM -> Game -> m Score
 aiScore gnugo game = do
   let
     gameStr = save game
-  log ("scoring: " <> gameStr)
-  let
-    newScore = GnuGO.score gnugo 0 gameStr
-  log ("received: " <> show newScore)
+  liftEffect $ log ("scoring: " <> gameStr)
+  newScore <- H.liftAff $ GnuGO.score gnugo 0 gameStr
+  liftEffect $ log ("received: " <> show newScore)
   pure
     $ if newScore < 0.0 then
         Score Black (newScore * -1.0)
@@ -258,40 +253,21 @@ handleAction = case _ of
       H.modify_ \s -> s { editCoord = Nothing, status = BadMove }
       drawBoard
 
-  playAi :: Maybe GnuGO.WASM -> Game -> H.HalogenM State Action () Output m Unit
-  playAi gnugo' game = do
+  playAi :: GnuGO.WASM -> Game -> H.HalogenM State Action () Output m Unit
+  playAi gnugo game = do
     H.modify_ \s -> s { game = game, status = WaitingAI }
     drawBoard
-    _ <- do
-      H.fork do
-        -- This delay seems to help halogen render the waiting ai message
-        -- Otherwise it skip the update and only show waiting for human again
-        -- as if wasm is freezing the rendering loop
-        H.liftAff (delay $ Milliseconds 10.0)
-        newGame' <- case gnugo' of
-          Nothing -> do
-            H.liftAff (delay $ Milliseconds 1000.0)
-            -- Fake a move
-            pure game
-          Just gnugo -> do
-            g <- H.liftAff $ liftEffect $ aiPlay gnugo game
-            pure g
-        case isCompleted newGame' of
-          true -> completeGame gnugo' newGame'
-          false -> do
-            H.modify_ \s -> s { game = newGame', status = WaitingHuman }
-            drawBoard
+    newGame' <- aiPlay gnugo game
+    case isCompleted newGame' of
+      true -> completeGame gnugo newGame'
+      false -> do
+        H.modify_ \s -> s { game = newGame', status = WaitingHuman }
+        drawBoard
     pure unit
 
-  completeGame gnugo' game = do
-    score' <- case gnugo' of
-      Nothing -> do
-        H.liftAff (delay $ Milliseconds 1000.0)
-        -- Fake a score
-        pure (Score Black 1.0)
-      Just gnugo -> do
-        s <- H.liftAff $ liftEffect $ aiScore gnugo game
-        pure s
+  completeGame :: GnuGO.WASM -> Game -> H.HalogenM State Action () Output m Unit
+  completeGame gnugo game = do
+    score' <- aiScore gnugo game
     H.modify_ \s -> s { game = game, status = GameOver score' }
     pure unit
 
