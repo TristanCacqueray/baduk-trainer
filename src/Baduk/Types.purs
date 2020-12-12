@@ -62,6 +62,10 @@ derive instance eqCoord :: Eq Coord
 
 derive instance ordCoord :: Ord Coord
 
+derive instance eqCapture :: Eq Capture
+
+derive instance ordCapture :: Ord Capture
+
 derive instance eqMove :: Eq PlayerMove
 
 derive instance ordMove :: Ord PlayerMove

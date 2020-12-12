@@ -19,6 +19,7 @@ You can edit this file as you like.
   , "canvas"
   , "random"
   , "web-dom"
+  , "web-storage"
   , "lists"
   ]
 , packages =

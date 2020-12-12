@@ -1,10 +1,12 @@
 module Trainer.MainHome (component) where
 
 import Prelude
+import Trainer.Level
 import Baduk (Game, Result(..), loadBaduk)
 import Bootstrap as Bootstrap
+import Data.Array (concat, fromFoldable, mapWithIndex)
 import Data.Either (Either(..))
-import Data.List (List(..), catMaybes, index, mapWithIndex, toUnfoldable, zipWith, (:))
+import Data.List (List(..), concatMap, length, range, zipWith)
 import Data.Maybe (Maybe(..))
 import Data.Symbol (SProxy(..))
 import Data.Traversable (sequence, traverse)
@@ -25,6 +27,7 @@ import Trainer.Board (boardSize, renderMiniBoard)
 import Trainer.Editor as Editor
 import Trainer.Player as Player
 
+-- import Trainer.Level (Save, getSave, initSave, storeSave)
 type Slots
   = ( editor :: Editor.Slot Unit
     , player :: Player.Slot Unit
@@ -36,58 +39,44 @@ player = SProxy :: SProxy "player"
 
 data Mode
   = ShowGames
-  | EditGame Int Game
-  | PlayGame Int Game
+  | ShowAbout
+  | EditGame Level Game
+  | PlayGame Level Game
 
 data Action
   = SwitchMode Mode
-  | Edited Int (Maybe String)
-  | Played Int (Maybe Result)
+  | Edited Level String (Maybe String)
+  | Played Level Game (Maybe Result)
+  | ResetSave
   | Initialize
 
 gnuGoURL :: String
 gnuGoURL = "/wasm-gnugo/gnugo.wasm"
 
-isHome :: Mode -> Boolean
-isHome = case _ of
-  ShowGames -> true
-  _ -> false
-
-homeNavClass :: Mode -> String
-homeNavClass m = case isHome m of
+navClass :: (Mode -> Boolean) -> Mode -> String
+navClass s m = case s m of
   true -> " active"
   false -> ""
 
-type TrainingGame
-  = { game :: Game
-    , id :: String
-    , completed :: Boolean
-    }
+homeNavClass :: Mode -> String
+homeNavClass = navClass isHome
+  where
+  isHome = case _ of
+    ShowGames -> true
+    _ -> false
+
+aboutNavClass :: Mode -> String
+aboutNavClass = navClass isAbout
+  where
+  isAbout = case _ of
+    ShowAbout -> true
+    _ -> false
 
 type State
-  = { trainingGames :: List TrainingGame, gnugo :: Maybe (Either String GnuGO.WASM), mode :: Mode }
-
--- Check https://senseis.xmp.net/?HandicapForSmallerBoardSizes
-defaultGames :: List String
-defaultGames =
-  "(;GN[Capture]SZ[5]PL[B];AB[bb][db][bd][ac][dd][ec];AW[bc][dc];)"
-    : "(;GN[Intro]SZ[6]PL[B];AB[bb][db][bd][cc];AW[bc][ee];)"
-    -- Simple ko testing game
-
-    -- : "(;GN[TestKo]SZ[5]KM[6.5]PL[B];AB[bc][ac][cb][dc][ec][bb][db];AW[cc][bd][ad][dd][ed][ce];)"
-
-    : "(;GN[Five]SZ[5]PL[B];AB[cc];)"
-    : "(;GN[Six]SZ[6]PL[B];AB[eb][be];))"
-    : "(;GN[Test]SZ[6]PL[B]KM[2.5];AB[bb][eb][be][bd][bc][bf][cb][db][fb][aa];AW[cd][dc][ed][de][ce][cf][ec][fc][cc];)"
-    : "(;GN[Eight]SZ[8]PL[B];AB[cc][ff];)"
-    : "(;GN[Medium]SZ[6]PL[B];AB[bb][eb][b;)"
-    : "(;GN[K25-9]SZ[9]PL[B];AB[cc][gc][gg][cg])"
-    : "(;GN[K23-9]SZ[9]PL[B];AB[cc][gc][gg])"
-    : "(;GN[K19-9]SZ[9]PL[B];AB[cc][gg])"
-    : "(;GN[K25-13]SZ[13]PL[B];AB[cc][kc][kk][ck][gc][gk][gg])"
-    : "(;GN[K23-13]SZ[13]PL[B];AB[dd][jd][jj][dj][dg][jg])"
-    : "(;GN[K21-13]SZ[13]PL[B]AB[dd][jd][jj][dj][gg])"
-    : Nil
+  = { levels :: List LevelGames
+    , gnugo :: Maybe (Either String GnuGO.WASM)
+    , mode :: Mode
+    }
 
 component :: forall query input output m. MonadAff m => MonadEffect m => H.Component HH.HTML query input output m
 component =
@@ -99,65 +88,66 @@ component =
 
 mkTrainingGames :: forall id. Show id => Boolean -> id -> String -> Maybe TrainingGame
 mkTrainingGames completed idx sgf = case loadBaduk sgf of
-  Just game -> Just { game, completed, id: "train-" <> show idx }
+  Just game -> Just { game, completed }
   _ -> Nothing
 
+--   games = catMaybes (mapWithIndex (mkTrainingGames false) defaultGames)
 initialState :: forall input. input -> State
-initialState _ = { trainingGames: games, gnugo: Nothing, mode: ShowGames }
-  where
-  games = catMaybes (mapWithIndex (mkTrainingGames false) defaultGames)
+initialState = const { levels: Nil, gnugo: Nothing, mode: ShowGames }
 
-replaceGame :: Int -> TrainingGame -> List TrainingGame -> List TrainingGame
-replaceGame idx tg l = go 0 l
-  where
-  go :: Int -> List TrainingGame -> List TrainingGame
-  go n = case _ of
-    Nil -> Nil
-    Cons x xs -> Cons (if n == idx then tg else x) (go (n + 1) xs)
-
-setCompleted :: List TrainingGame -> Int -> List TrainingGame
-setCompleted xs idx = case index xs idx of
-  Just tg -> replaceGame idx (tg { completed = true }) xs
-  Nothing -> xs
-
+-- setCompleted :: List TrainingGame -> Int -> List TrainingGame
+-- setCompleted xs idx = case index xs idx of
+--   Just tg -> replaceGame idx (tg { completed = true }) xs
+--   Nothing -> xs
 handleAction :: forall output m. MonadAff m => MonadEffect m => Action -> H.HalogenM State Action Slots output m Unit
 handleAction = case _ of
   SwitchMode mode -> (H.modify \s -> s { mode = mode }) >>= redraw
-  Edited idx maybeGame -> do
-    state <- H.get
-    let
-      newGames = case maybeGame of
-        Just g -> case mkTrainingGames false idx g of
-          Just g' -> replaceGame idx g' state.trainingGames
-          Nothing -> state.trainingGames
-        Nothing -> state.trainingGames
-    (H.modify \s -> s { trainingGames = newGames, mode = ShowGames }) >>= redraw
-  Played idx maybeResult -> do
-    H.liftEffect $ log ("Played " <> show idx <> " : " <> show maybeResult)
-    state <- H.get
-    let
-      trainingGames = case maybeResult of
-        Just Win -> setCompleted state.trainingGames idx
-        _ -> state.trainingGames
-    (H.modify \s -> s { mode = ShowGames, trainingGames = trainingGames }) >>= redraw
+  Edited level id maybeGame -> case maybeGame of
+    Just gameSgf -> case loadBaduk gameSgf of
+      Just game -> showGames
+      -- ( H.modify \state -> --     state --       { levels = replaceGame level id { completed: false, game } state.levels, mode = ShowGames } -- ) --   >>= redraw
+      Nothing -> showGames
+    Nothing -> showGames
+  Played level game maybeResult -> case maybeResult of
+    Just Win -> do
+      state <- H.get
+      levels <- H.liftEffect $ completeLevel level game state.levels
+      (H.modify \s -> s { levels = levels, mode = ShowGames }) >>= redraw
+      pure unit
+    _ -> showGames
   Initialize -> do
     gnugo <- H.liftAff $ GnuGO.get gnuGoURL
-    (H.modify \s -> s { gnugo = Just gnugo }) >>= redraw
+    levels <- H.liftEffect loadLevels
+    (H.modify \s -> s { levels = levels, gnugo = Just gnugo }) >>= redraw
+  ResetSave -> do
+    levels <- H.liftEffect $ resetLevels
+    H.modify_ \s -> s { levels = levels }
   where
+  showGames = H.modify_ \s -> s { mode = ShowGames }
+
   redraw state =
     H.liftEffect do
       canvases' <- getCanvases state
+      log (show $ concatMap getGameId state.levels)
       case canvases' of
         Just canvases -> do
           c <- traverse Canvas.getContext2D canvases
-          _ <- traverse (uncurry renderMiniBoard) (zipWith (\ctx tg -> Tuple ctx tg.game) c state.trainingGames)
+          _ <- traverse (uncurry renderMiniBoard) (zipWith (\ctx tg -> Tuple ctx tg.game) c (concatMap getGames state.levels))
           pure unit
-        Nothing -> log "Where are the canvases?!"
+        Nothing -> log "Where are the games canvases?!"
 
   getCanvases :: State -> Effect (Maybe (List CanvasElement))
   getCanvases state =
     sequence
-      <$> traverse getCanvasElementById (map (\tg -> tg.id) state.trainingGames)
+      <$> traverse getCanvasElementById (concatMap getGameId state.levels)
+
+  getGameId :: LevelGames -> List String
+  getGameId (LevelGames level _ games) = case games of
+    Nil -> Nil
+    _ -> map (\idx -> show level <> "-" <> show idx) (range 0 (length games - 1))
+
+  getGames :: LevelGames -> List TrainingGame
+  getGames (LevelGames _ _ games) = games
 
 -- Render
 render :: forall m. MonadAff m => MonadEffect m => State -> H.ComponentHTML Action Slots m
@@ -178,18 +168,48 @@ render state =
                 , HP.href "#"
                 ]
                 [ HH.text "Home" ]
+            , HH.a
+                [ HP.class_ (ClassName ("nav-link" <> aboutNavClass state.mode))
+                , HE.onClick $ clk ShowAbout
+                , HP.href "#"
+                ]
+                [ HH.text "About" ]
             ]
         ]
     ]
 
-  info =
+  info extra =
     Bootstrap.card "Welcome to Baduk Trainer"
-      [ HH.text "This application is currently beta, some features are "
-      , Bootstrap.a "https://github.com/TristanCacqueray/baduk-trainer#features" "missing"
-      , HH.text ". Checkout the "
-      , Bootstrap.a "https://senseis.xmp.net/?RulesOfGoIntroductory" "rules of baduk"
-      , HH.text " to learn the basics first."
-      ]
+      $ [ HH.text "Learn the game of baduk by playing training games against the gnugo AI. "
+        , HH.text "Checkout the "
+        , Bootstrap.a "https://senseis.xmp.net/?RulesOfGoIntroductory" "rules of baduk"
+        , HH.text " to learn the basics first."
+        ]
+      <> extra
+
+  newPlayer = isNew state.levels
+
+  mainInfo =
+    if newPlayer then
+      [ info [] ]
+    else
+      []
+
+  aboutInfo =
+    info
+      ( [ HH.hr_
+        , HH.p_
+            [ HH.text "Baduk Trainer is a free software, checkout the "
+            , Bootstrap.a "https://github.com/TristanCacqueray/baduk-trainer" "source"
+            , HH.text ". It is written in PureScript and it integrates a WebAssembly build of "
+            , Bootstrap.a "https://www.gnu.org/software/gnugo" "gnugo"
+            , HH.text " so that it can be used in a web browser offline."
+            ]
+        , case newPlayer of
+            true -> Bootstrap.button "primary" "Pick a game" $ clk ShowGames
+            false -> Bootstrap.button "warning" "Reset state" $ \e -> Just ResetSave
+        ]
+      )
 
   body = case state.gnugo of
     Nothing -> [ Bootstrap.center [ Bootstrap.spinner ] ]
@@ -204,25 +224,41 @@ render state =
           ]
       ]
     Just (Right gnugo) -> case state.mode of
+      ShowAbout -> [ aboutInfo ]
       ShowGames ->
-        [ info
-        , HH.h1_
-            [ HH.text "Select a training game" ]
-        , Bootstrap.row $ toUnfoldable $ mapWithIndex renderGamePicker state.trainingGames
-        ]
-      EditGame idx game -> [ HH.slot editor unit Editor.component { game, gnugo } (Just <<< Edited idx) ]
-      PlayGame idx game -> [ HH.slot player unit Player.component { game, gnugo } (Just <<< Played idx) ]
+        mainInfo
+          <> ( [ HH.h1_
+                  [ HH.text "Select a training game" ]
+              ]
+                <> (concat $ fromFoldable $ map renderGamesPicker state.levels)
+            )
+      EditGame level game -> [ HH.slot editor unit Editor.component { game, gnugo } (Just <<< Edited level game.name) ]
+      PlayGame level game -> [ HH.slot player unit Player.component { game, gnugo } (Just <<< Played level game) ]
 
   clk mode = \e -> Just (SwitchMode mode)
 
-  renderGamePicker idx tg =
+  showLevel rank = case _ of
+    Intro -> "Introduction"
+    (Size Short) -> "Short (" <> show rank <> ")"
+    (Size Medium) -> "Medium (" <> show rank <> ")"
+    (Size Long) -> "Long (" <> show rank <> ")"
+
+  renderGamesPicker = case _ of
+    LevelGames _ _ Nil -> []
+    LevelGames level rank games ->
+      [ HH.h4_ [ HH.text (showLevel rank level) ]
+      , Bootstrap.row $ mapWithIndex (renderGamePicker level) (fromFoldable games)
+      , HH.hr_
+      ]
+
+  renderGamePicker level idx tg =
     Bootstrap.card tg.game.name
-      [ Bootstrap.row [ Bootstrap.canvas tg.id $ boardSize tg.game.size `div` 2 ]
+      [ Bootstrap.row [ Bootstrap.canvas (show level <> "-" <> show idx) $ boardSize tg.game.size `div` 2 ]
       , Bootstrap.row
           [ Bootstrap.button
               (if tg.completed then "success" else "primary")
               (if tg.completed then "replay" else "play")
-              $ clk (PlayGame idx tg.game)
-          , Bootstrap.button "seconday" "edit" $ clk (EditGame idx tg.game)
+              $ clk (PlayGame level tg.game)
+          , Bootstrap.button "secondary" "edit" $ clk (EditGame level tg.game)
           ]
       ]
