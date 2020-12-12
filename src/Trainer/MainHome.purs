@@ -2,7 +2,7 @@ module Trainer.MainHome (component) where
 
 import Prelude
 import Baduk (Game, Result(..), loadBaduk)
-import Data.List (List(..), catMaybes, mapWithIndex, toUnfoldable, zipWith)
+import Data.List (List(..), catMaybes, mapWithIndex, toUnfoldable, zipWith, (:))
 import Data.Maybe (Maybe(..))
 import Data.Symbol (SProxy(..))
 import Data.Traversable (sequence, traverse)
@@ -33,13 +33,11 @@ editor = SProxy :: SProxy "editor"
 
 player = SProxy :: SProxy "player"
 
-type Input
-  = { trainingGames :: List String, gnugo :: Maybe GnuGO.WASM }
-
 data Mode
   = ShowGames
   | EditGame Int String
   | PlayGame Int String
+  | Loading
 
 data Action
   = SwitchMode Mode
@@ -67,7 +65,29 @@ type TrainingGame
 type State
   = { trainingGames :: List TrainingGame, gnugo :: Maybe GnuGO.WASM, mode :: Mode }
 
-component :: forall query output m. MonadAff m => MonadEffect m => H.Component HH.HTML query Input output m
+-- Check https://senseis.xmp.net/?HandicapForSmallerBoardSizes
+defaultGames :: List String
+defaultGames =
+  "(;GN[Capture]SZ[5]PL[B];AB[bb][db][bd][ac][dd][ec];AW[bc][dc];)"
+    : "(;GN[Intro]SZ[6]PL[B];AB[bb][db][bd][cc];AW[bc][ee];)"
+    -- Simple ko testing game
+
+    -- : "(;GN[TestKo]SZ[5]KM[6.5]PL[B];AB[bc][ac][cb][dc][ec][bb][db];AW[cc][bd][ad][dd][ed][ce];)"
+
+    : "(;GN[Five]SZ[5]PL[B];AB[cc];)"
+    : "(;GN[Six]SZ[6]PL[B];AB[eb][be];))"
+    : "(;GN[Test]SZ[6]PL[B]KM[2.5];AB[bb][eb][be][bd][bc][bf][cb][db][fb][aa];AW[cd][dc][ed][de][ce][cf][ec][fc][cc];)"
+    : "(;GN[Eight]SZ[8]PL[B];AB[cc][ff];)"
+    : "(;GN[Medium]SZ[6]PL[B];AB[bb][eb][b;)"
+    : "(;GN[K25-9]SZ[9]PL[B];AB[cc][gc][gg][cg])"
+    : "(;GN[K23-9]SZ[9]PL[B];AB[cc][gc][gg])"
+    : "(;GN[K19-9]SZ[9]PL[B];AB[cc][gg])"
+    : "(;GN[K25-13]SZ[13]PL[B];AB[cc][kc][kk][ck][gc][gk][gg])"
+    : "(;GN[K23-13]SZ[13]PL[B];AB[dd][jd][jj][dj][dg][jg])"
+    : "(;GN[K21-13]SZ[13]PL[B]AB[dd][jd][jj][dj][gg])"
+    : Nil
+
+component :: forall query input output m. MonadAff m => MonadEffect m => H.Component HH.HTML query input output m
 component =
   H.mkComponent
     { initialState
@@ -80,10 +100,10 @@ mkTrainingGames completed idx sgf = case loadBaduk sgf of
   Just game -> Just { sgf, game, completed, id: "train-" <> show idx }
   _ -> Nothing
 
-initialState :: Input -> State
-initialState { trainingGames, gnugo } = { trainingGames: games, gnugo, mode: ShowGames }
+initialState :: forall input. input -> State
+initialState _ = { trainingGames: games, gnugo: Nothing, mode: Loading }
   where
-  games = catMaybes (mapWithIndex (mkTrainingGames false) trainingGames)
+  games = catMaybes (mapWithIndex (mkTrainingGames false) defaultGames)
 
 replaceGame :: Int -> Maybe TrainingGame -> List TrainingGame -> List TrainingGame
 replaceGame _ Nothing l = l
@@ -95,7 +115,7 @@ replaceGame idx (Just tg) l = go 0 l
     Nil -> Nil
     Cons x xs -> Cons (if n == idx then tg else x) (go (n + 1) xs)
 
-handleAction :: forall output m. MonadEffect m => Action -> H.HalogenM State Action Slots output m Unit
+handleAction :: forall output m. MonadAff m => MonadEffect m => Action -> H.HalogenM State Action Slots output m Unit
 handleAction = case _ of
   SwitchMode mode -> (H.modify \s -> s { mode = mode }) >>= redraw
   Edited idx maybeGame -> do
@@ -115,7 +135,9 @@ handleAction = case _ of
         Just Win -> replaceGame idx (mkTrainingGames true idx gameSgf) state.trainingGames
         _ -> state.trainingGames
     (H.modify \s -> s { mode = ShowGames, trainingGames = trainingGames }) >>= redraw
-  Initialize -> H.get >>= redraw
+  Initialize -> do
+    gnugo <- H.liftAff $ GnuGO.get "/wasm-gnugo/gnugo.wasm"
+    (H.modify \s -> s { gnugo = Just gnugo, mode = ShowGames }) >>= redraw
   where
   redraw state =
     liftEffect do
@@ -164,6 +186,7 @@ render state =
       ]
 
   body = case state.mode of
+    Loading -> [ HH.text "loading..." ]
     ShowGames ->
       [ info
       , HH.h1_

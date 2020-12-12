@@ -6,6 +6,7 @@ You can edit this file as you like.
 , dependencies =
   [ "console"
   , "effect"
+  , "aff-promise"
   , "integers"
   , "psci-support"
   , "parsing"
