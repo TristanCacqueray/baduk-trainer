@@ -35,7 +35,7 @@ import Trainer.Player as Player
 import Web.UIEvent.MouseEvent (MouseEvent)
 
 type Input
-  = { sgfStr :: String
+  = { game :: Game
     , gnugo :: GnuGO.WASM
     }
 
@@ -59,11 +59,7 @@ component =
     }
 
 initialSGFEditorState :: Input -> State
-initialSGFEditorState { sgfStr, gnugo } = { editColor: AddBlackStone, editPos: Nothing, message, mode: Edit, game, gnugo }
-  where
-  Tuple game message = case loadBaduk sgfStr of
-    Just g -> Tuple g ""
-    Nothing -> Tuple initGame ("Invalid sgf: " <> sgfStr)
+initialSGFEditorState { game, gnugo } = { editColor: AddBlackStone, editPos: Nothing, message: "", mode: Edit, game, gnugo }
 
 -- Rendering primitives
 newtype Selected

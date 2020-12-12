@@ -3,7 +3,7 @@ module Trainer.MainHome (component) where
 import Prelude
 import Baduk (Game, Result(..), loadBaduk)
 import Data.Either (Either(..))
-import Data.List (List(..), catMaybes, mapWithIndex, toUnfoldable, zipWith, (:))
+import Data.List (List(..), catMaybes, index, mapWithIndex, toUnfoldable, zipWith, (:))
 import Data.Maybe (Maybe(..))
 import Data.Symbol (SProxy(..))
 import Data.Traversable (sequence, traverse)
@@ -36,13 +36,13 @@ player = SProxy :: SProxy "player"
 
 data Mode
   = ShowGames
-  | EditGame Int String
-  | PlayGame Int String
+  | EditGame Int Game
+  | PlayGame Int Game
 
 data Action
   = SwitchMode Mode
   | Edited Int (Maybe String)
-  | Played Int String (Maybe Result)
+  | Played Int (Maybe Result)
   | Initialize
 
 gnuGoURL :: String
@@ -59,8 +59,7 @@ homeNavClass m = case isHome m of
   false -> ""
 
 type TrainingGame
-  = { sgf :: String
-    , game :: Game
+  = { game :: Game
     , id :: String
     , completed :: Boolean
     }
@@ -100,7 +99,7 @@ component =
 
 mkTrainingGames :: forall id. Show id => Boolean -> id -> String -> Maybe TrainingGame
 mkTrainingGames completed idx sgf = case loadBaduk sgf of
-  Just game -> Just { sgf, game, completed, id: "train-" <> show idx }
+  Just game -> Just { game, completed, id: "train-" <> show idx }
   _ -> Nothing
 
 initialState :: forall input. input -> State
@@ -108,15 +107,18 @@ initialState _ = { trainingGames: games, gnugo: Nothing, mode: ShowGames }
   where
   games = catMaybes (mapWithIndex (mkTrainingGames false) defaultGames)
 
-replaceGame :: Int -> Maybe TrainingGame -> List TrainingGame -> List TrainingGame
-replaceGame _ Nothing l = l
-
-replaceGame idx (Just tg) l = go 0 l
+replaceGame :: Int -> TrainingGame -> List TrainingGame -> List TrainingGame
+replaceGame idx tg l = go 0 l
   where
   go :: Int -> List TrainingGame -> List TrainingGame
   go n = case _ of
     Nil -> Nil
     Cons x xs -> Cons (if n == idx then tg else x) (go (n + 1) xs)
+
+setCompleted :: List TrainingGame -> Int -> List TrainingGame
+setCompleted xs idx = case index xs idx of
+  Just tg -> replaceGame idx (tg { completed = true }) xs
+  Nothing -> xs
 
 handleAction :: forall output m. MonadAff m => MonadEffect m => Action -> H.HalogenM State Action Slots output m Unit
 handleAction = case _ of
@@ -126,16 +128,16 @@ handleAction = case _ of
     let
       newGames = case maybeGame of
         Just g -> case mkTrainingGames false idx g of
-          Just g' -> replaceGame idx (Just g') state.trainingGames
+          Just g' -> replaceGame idx g' state.trainingGames
           Nothing -> state.trainingGames
         Nothing -> state.trainingGames
     (H.modify \s -> s { trainingGames = newGames, mode = ShowGames }) >>= redraw
-  Played idx gameSgf maybeResult -> do
+  Played idx maybeResult -> do
     liftEffect $ log ("Played " <> show idx <> " : " <> show maybeResult)
     state <- H.get
     let
       trainingGames = case maybeResult of
-        Just Win -> replaceGame idx (mkTrainingGames true idx gameSgf) state.trainingGames
+        Just Win -> setCompleted state.trainingGames idx
         _ -> state.trainingGames
     (H.modify \s -> s { mode = ShowGames, trainingGames = trainingGames }) >>= redraw
   Initialize -> do
@@ -163,7 +165,6 @@ render state =
   HH.div
     [ HP.class_ (ClassName "container") ]
     (nav <> body)
-  --    (toUnfoldable $ map (\game -> HH.slot editor 0 Editor.component { game } absurd) state.games)
   where
   nav =
     [ HH.nav
@@ -212,10 +213,8 @@ render state =
             [ HP.class_ (ClassName "row") ]
             (toUnfoldable $ mapWithIndex renderGamePicker state.trainingGames)
         ]
-      EditGame n s -> [ HH.slot editor unit Editor.component { sgfStr: s, gnugo: gnugo } (Just <<< Edited n) ]
-      PlayGame n s -> case loadBaduk s of
-        Just g -> [ HH.slot player unit Player.component { game: g, gnugo: gnugo } (Just <<< Played n s) ]
-        Nothing -> [ HH.text ("Invalid game: " <> s) ]
+      EditGame idx game -> [ HH.slot editor unit Editor.component { game, gnugo } (Just <<< Edited idx) ]
+      PlayGame idx game -> [ HH.slot player unit Player.component { game, gnugo } (Just <<< Played idx) ]
 
   clk mode = HE.onClick \e -> Just (SwitchMode mode)
 
@@ -240,12 +239,12 @@ render state =
               [ HP.class_ (ClassName "row") ]
               [ HH.a
                   [ HP.class_ (ClassName ("btn btn-" <> if tg.completed then "success" else "primary"))
-                  , clk (PlayGame idx tg.sgf)
+                  , clk (PlayGame idx tg.game)
                   ]
                   [ HH.text (if tg.completed then "replay" else "play") ]
               , HH.a
                   [ HP.class_ (ClassName "btn btn-secondary")
-                  , clk (EditGame idx tg.sgf)
+                  , clk (EditGame idx tg.game)
                   ]
                   [ HH.text "edit" ]
               ]
