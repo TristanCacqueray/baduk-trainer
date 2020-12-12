@@ -2,6 +2,7 @@ module Trainer.MainHome (component) where
 
 import Prelude
 import Baduk (Game, Result(..), loadBaduk)
+import Data.Either (Either(..))
 import Data.List (List(..), catMaybes, mapWithIndex, toUnfoldable, zipWith, (:))
 import Data.Maybe (Maybe(..))
 import Data.Symbol (SProxy(..))
@@ -37,13 +38,15 @@ data Mode
   = ShowGames
   | EditGame Int String
   | PlayGame Int String
-  | Loading
 
 data Action
   = SwitchMode Mode
   | Edited Int (Maybe String)
   | Played Int String (Maybe Result)
   | Initialize
+
+gnuGoURL :: String
+gnuGoURL = "/wasm-gnugo/gnugo.wasm"
 
 isHome :: Mode -> Boolean
 isHome = case _ of
@@ -63,7 +66,7 @@ type TrainingGame
     }
 
 type State
-  = { trainingGames :: List TrainingGame, gnugo :: Maybe GnuGO.WASM, mode :: Mode }
+  = { trainingGames :: List TrainingGame, gnugo :: Maybe (Either String GnuGO.WASM), mode :: Mode }
 
 -- Check https://senseis.xmp.net/?HandicapForSmallerBoardSizes
 defaultGames :: List String
@@ -101,7 +104,7 @@ mkTrainingGames completed idx sgf = case loadBaduk sgf of
   _ -> Nothing
 
 initialState :: forall input. input -> State
-initialState _ = { trainingGames: games, gnugo: Nothing, mode: Loading }
+initialState _ = { trainingGames: games, gnugo: Nothing, mode: ShowGames }
   where
   games = catMaybes (mapWithIndex (mkTrainingGames false) defaultGames)
 
@@ -136,8 +139,8 @@ handleAction = case _ of
         _ -> state.trainingGames
     (H.modify \s -> s { mode = ShowGames, trainingGames = trainingGames }) >>= redraw
   Initialize -> do
-    gnugo <- H.liftAff $ GnuGO.get "/wasm-gnugo/gnugo.wasm"
-    (H.modify \s -> s { gnugo = Just gnugo, mode = ShowGames }) >>= redraw
+    gnugo <- H.liftAff $ GnuGO.get gnuGoURL
+    (H.modify \s -> s { gnugo = Just gnugo }) >>= redraw
   where
   redraw state =
     liftEffect do
@@ -185,20 +188,34 @@ render state =
       , HH.text (" to learn the basics first.")
       ]
 
-  body = case state.mode of
-    Loading -> [ HH.text "loading..." ]
-    ShowGames ->
-      [ info
-      , HH.h1_
-          [ HH.text "Select a training game" ]
-      , HH.div
-          [ HP.class_ (ClassName "row") ]
-          (toUnfoldable $ mapWithIndex renderGamePicker state.trainingGames)
+  body = case state.gnugo of
+    Nothing ->
+      [ HH.div
+          [ HP.class_ (ClassName "text-center") ]
+          [ HH.div [ HP.class_ (ClassName "spinner-border m-5") ] [] ]
       ]
-    EditGame n s -> [ HH.slot editor unit Editor.component { sgfStr: s, gnugo: state.gnugo } (Just <<< Edited n) ]
-    PlayGame n s -> case loadBaduk s of
-      Just g -> [ HH.slot player unit Player.component { game: g, gnugo: state.gnugo } (Just <<< Played n s) ]
-      Nothing -> [ HH.text ("Invalid game: " <> s) ]
+    Just (Left error) ->
+      [ HH.div
+          [ HP.class_ (ClassName "alert alert-danger") ]
+          [ HH.h4 [ HP.class_ (ClassName "alert-heading") ] [ HH.text $ "Failed to load " <> gnuGoURL ]
+          , HH.text error
+          , HH.hr_
+          , HH.text "Try to refresh or use another browser."
+          ]
+      ]
+    Just (Right gnugo) -> case state.mode of
+      ShowGames ->
+        [ info
+        , HH.h1_
+            [ HH.text "Select a training game" ]
+        , HH.div
+            [ HP.class_ (ClassName "row") ]
+            (toUnfoldable $ mapWithIndex renderGamePicker state.trainingGames)
+        ]
+      EditGame n s -> [ HH.slot editor unit Editor.component { sgfStr: s, gnugo: Just gnugo } (Just <<< Edited n) ]
+      PlayGame n s -> case loadBaduk s of
+        Just g -> [ HH.slot player unit Player.component { game: g, gnugo: Just gnugo } (Just <<< Played n s) ]
+        Nothing -> [ HH.text ("Invalid game: " <> s) ]
 
   clk mode = HE.onClick \e -> Just (SwitchMode mode)
 

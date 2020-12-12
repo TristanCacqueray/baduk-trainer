@@ -2,8 +2,8 @@
 
 let loader = require("../../../wasm-gnugo/javascript/gnugo.js");
 
-exports.getP = (wasmURL) => () => (
-  loader.get(wasmURL).catch(e => console.log("oops", e))
+exports.getP = (left, right, wasmURL) => () => (
+  loader.get(wasmURL).then(right).catch(e => left(e.name + ': ' + e.message ))
 );
 
 exports.playU = function (module, seed, gameStr) {
