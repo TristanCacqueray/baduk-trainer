@@ -2,6 +2,7 @@ module Trainer.MainHome (component) where
 
 import Prelude
 import Baduk (Game, Result(..), loadBaduk)
+import Bootstrap as Bootstrap
 import Data.Either (Either(..))
 import Data.List (List(..), catMaybes, index, mapWithIndex, toUnfoldable, zipWith, (:))
 import Data.Maybe (Maybe(..))
@@ -15,7 +16,6 @@ import Effect.Console (log)
 import GnuGO as GnuGO
 import Graphics.Canvas (CanvasElement, getCanvasElementById)
 import Graphics.Canvas as Canvas
-import Halogen (PropName(..), liftEffect)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Core (ClassName(..))
@@ -133,7 +133,7 @@ handleAction = case _ of
         Nothing -> state.trainingGames
     (H.modify \s -> s { trainingGames = newGames, mode = ShowGames }) >>= redraw
   Played idx maybeResult -> do
-    liftEffect $ log ("Played " <> show idx <> " : " <> show maybeResult)
+    H.liftEffect $ log ("Played " <> show idx <> " : " <> show maybeResult)
     state <- H.get
     let
       trainingGames = case maybeResult of
@@ -145,7 +145,7 @@ handleAction = case _ of
     (H.modify \s -> s { gnugo = Just gnugo }) >>= redraw
   where
   redraw state =
-    liftEffect do
+    H.liftEffect do
       canvases' <- getCanvases state
       case canvases' of
         Just canvases -> do
@@ -173,32 +173,31 @@ render state =
         , HH.div
             [ HP.class_ (ClassName "navbar-nav") ]
             [ HH.a
-                [ HP.class_ (ClassName ("nav-link" <> homeNavClass state.mode)), clk ShowGames, HP.href "#" ]
+                [ HP.class_ (ClassName ("nav-link" <> homeNavClass state.mode))
+                , HE.onClick $ clk ShowGames
+                , HP.href "#"
+                ]
                 [ HH.text "Home" ]
             ]
         ]
     ]
 
   info =
-    HH.div
-      [ HP.class_ (ClassName "alert alert-warning") ]
-      [ HH.text ("This application is currently beta, some features are ")
-      , HH.a [ HP.href "https://github.com/TristanCacqueray/baduk-trainer#features" ] [ HH.text "missing" ]
-      , HH.text (". Checkout the ")
-      , HH.a [ HP.href "https://senseis.xmp.net/?RulesOfGoIntroductory" ] [ HH.text "rules of baduk" ]
-      , HH.text (" to learn the basics first.")
+    Bootstrap.card "Welcome to Baduk Trainer"
+      [ HH.text "This application is currently beta, some features are "
+      , Bootstrap.a "https://github.com/TristanCacqueray/baduk-trainer#features" "missing"
+      , HH.text ". Checkout the "
+      , Bootstrap.a "https://senseis.xmp.net/?RulesOfGoIntroductory" "rules of baduk"
+      , HH.text " to learn the basics first."
       ]
 
   body = case state.gnugo of
-    Nothing ->
-      [ HH.div
-          [ HP.class_ (ClassName "text-center") ]
-          [ HH.div [ HP.class_ (ClassName "spinner-border m-5") ] [] ]
-      ]
+    Nothing -> [ Bootstrap.center [ Bootstrap.spinner ] ]
     Just (Left error) ->
-      [ HH.div
-          [ HP.class_ (ClassName "alert alert-danger") ]
-          [ HH.h4 [ HP.class_ (ClassName "alert-heading") ] [ HH.text $ "Failed to load " <> gnuGoURL ]
+      [ Bootstrap.alertDanger
+          [ HH.h4
+              [ HP.class_ (ClassName "alert-heading") ]
+              [ HH.text $ "Failed to load " <> gnuGoURL ]
           , HH.text error
           , HH.hr_
           , HH.text "Try to refresh or use another browser."
@@ -209,44 +208,21 @@ render state =
         [ info
         , HH.h1_
             [ HH.text "Select a training game" ]
-        , HH.div
-            [ HP.class_ (ClassName "row") ]
-            (toUnfoldable $ mapWithIndex renderGamePicker state.trainingGames)
+        , Bootstrap.row $ toUnfoldable $ mapWithIndex renderGamePicker state.trainingGames
         ]
       EditGame idx game -> [ HH.slot editor unit Editor.component { game, gnugo } (Just <<< Edited idx) ]
       PlayGame idx game -> [ HH.slot player unit Player.component { game, gnugo } (Just <<< Played idx) ]
 
-  clk mode = HE.onClick \e -> Just (SwitchMode mode)
+  clk mode = \e -> Just (SwitchMode mode)
 
   renderGamePicker idx tg =
-    HH.div
-      [ HP.class_ (ClassName "card") ]
-      [ HH.div
-          [ HP.class_ (ClassName "card-body") ]
-          [ HH.h5
-              [ HP.class_ (ClassName "card-title") ]
-              [ HH.text tg.game.name ]
-          , HH.div
-              [ HP.class_ (ClassName "row") ]
-              [ HH.canvas
-                  [ HP.id_ tg.id
-                  , HP.width (boardSize tg.game.size `div` 2)
-                  , HP.height (boardSize tg.game.size `div` 2)
-                  , HP.prop (PropName "style") "border: 1px solid black"
-                  ]
-              ]
-          , HH.div
-              [ HP.class_ (ClassName "row") ]
-              [ HH.a
-                  [ HP.class_ (ClassName ("btn btn-" <> if tg.completed then "success" else "primary"))
-                  , clk (PlayGame idx tg.game)
-                  ]
-                  [ HH.text (if tg.completed then "replay" else "play") ]
-              , HH.a
-                  [ HP.class_ (ClassName "btn btn-secondary")
-                  , clk (EditGame idx tg.game)
-                  ]
-                  [ HH.text "edit" ]
-              ]
+    Bootstrap.card tg.game.name
+      [ Bootstrap.row [ Bootstrap.canvas tg.id $ boardSize tg.game.size `div` 2 ]
+      , Bootstrap.row
+          [ Bootstrap.button
+              (if tg.completed then "success" else "primary")
+              (if tg.completed then "replay" else "play")
+              $ clk (PlayGame idx tg.game)
+          , Bootstrap.button "seconday" "edit" $ clk (EditGame idx tg.game)
           ]
       ]
