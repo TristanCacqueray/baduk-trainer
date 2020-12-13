@@ -9,7 +9,7 @@ import Data.List (many, some)
 import Data.Maybe (Maybe(..), optional)
 import Data.Number (fromString)
 import Data.String.CodeUnits (fromCharArray)
-import Prelude (bind, pure, ($), (-), (/=), (<>), (>>=))
+import Prelude (bind, pure, ($), (&&), (-), (/=), (<=), (<>), (>=), (>>=))
 import SGF.Types (Color(..), GameTree(..), Node, Property(..), SGF, Sequence, Value(..))
 import Text.Parsing.Parser (ParseError, Parser, runParser, fail)
 import Text.Parsing.Parser.Combinators (between, try)
@@ -51,10 +51,17 @@ propertyValue =
       ( case txt of
           [ 'B' ] -> Color Black
           [ 'W' ] -> Color White
-          [ a, b ] -> Point (pointPos a) (pointPos b)
+          [ a, b ] ->
+            if inRange a && inRange b then
+              Point (pointPos a) (pointPos b)
+            else
+              Text (fromCharArray [ a, b ])
           _ -> Text (fromCharArray txt)
       )
     where
+    inRange :: Char -> Boolean
+    inRange c = c >= 'a' && c <= 'z'
+
     pointPos ∷ Char → Int
     pointPos c = toCharCode c - toCharCode 'a'
 

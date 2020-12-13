@@ -110,7 +110,7 @@ defaultIntroGames =
   new false
     $ "(;GN[Capture]SZ[5]PL[B];AB[bb][db][bd][ac][dd][ec];AW[bc][dc];)"
     : "(;GN[Pass]SZ[6]PL[B]KM[2.5];AB[bb][eb][be][bd][bc][bf][cb][db][fb][aa];AW[cd][dc][ed][de][ce][cf][ec][fc][cc];)"
-    : "(;GN[Ko ]SZ[5]KM[2]PL[B];AB[bc][ac][cb][dc][ec][bb][db];AW[cc][bd][ad][dd][ed][ce];)"
+    : "(;GN[Ko]SZ[5]KM[2]PL[B];AB[bc][ac][cb][dc][ec][bb][db];AW[cc][bd][ad][dd][ed][ce];)"
     : "(;GN[Intro]SZ[6]PL[B];AB[bb][db][bd][cc];AW[bc][ee];)"
     : "(;GN[Territory]SZ[5]KM[6.5]PL[B];)"
     : "(;GN[Handicap2]SZ[7]KM[6.5]PL[B];AB[ce][ec];)"
