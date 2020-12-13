@@ -10,8 +10,9 @@ Go to the [website](https://tristancacqueray.github.io/baduk-trainer/) and play 
 
 - Trainer
   - [x] game list
-  - [ ] save state in local storage
-  - [ ] display progressive game list
+  - [x] save state in local storage
+  - [x] display progressive game list
+  - [ ] generate new games based on rank
 - Editor
   - [x] stones
   - [x] name, size, komi

@@ -1,10 +1,23 @@
-module Trainer.Level where
+-- | A module to manage training level
+-- This module is quite verbose and could be simplified, but it gets the job done
+module Trainer.Level
+  ( Level(..)
+  , LevelGames(..)
+  , Size(..)
+  , TrainingGame
+  , addCustomLevel
+  , completeLevel
+  , isNew
+  , loadLevels
+  , removeCustomLevel
+  , resetLevels
+  ) where
 
 import Prelude
-import Baduk (Game, loadBaduk)
+import Baduk (Game, loadBaduk, save)
 import Data.Foldable (for_)
 import Data.Int (fromString)
-import Data.List (List(..), catMaybes, drop, elem, filter, foldl, fromFoldable, take, toUnfoldable, (:))
+import Data.List (List(..), catMaybes, drop, elem, foldl, fromFoldable, take, toUnfoldable, (:))
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.String (Pattern(..), joinWith, split)
 import Data.Traversable (for)
@@ -19,7 +32,8 @@ data Size
   | Long
 
 data Level
-  = Intro
+  = Custom
+  | Intro
   | Size Size
 
 derive instance eqSize :: Eq Size
@@ -31,13 +45,14 @@ derive instance eqLevel :: Eq Level
 derive instance ordLevel :: Ord Level
 
 instance showLevel :: Show Level where
+  show Custom = "bt-custom"
   show Intro = "bt-intro"
   show (Size Short) = "bt-short"
   show (Size Medium) = "bt-medium"
   show (Size Long) = "bt-long"
 
 allLevels :: List Level
-allLevels = Intro : Size Short : Size Medium : Size Long : Nil
+allLevels = Custom : Intro : Size Short : Size Medium : Size Long : Nil
 
 type TrainingGame
   = { game :: Game
@@ -124,18 +139,35 @@ loadLevels = do
   loadLevel :: Storage -> Level -> Effect LevelGames
   loadLevel storage level = case level of
     Intro -> do
-      intro <- fromFoldable <<< split (Pattern ",") <<< fromMaybe "" <$> getItem (show level) storage
+      intro <- readList level "," storage
       pure $ LevelGames level 0
         $ case intro of
-            ("" : Nil) -> defaultIntroGames
             Nil -> defaultIntroGames
             xs -> introGames xs
+    Custom -> do
+      games <- readList level "##" storage
+      pure $ LevelGames Custom 0
+        $ case games of
+            Nil -> Nil
+            xs -> new false xs
     Size size -> do
-      rank <- readLevel <$> getItem (show level) storage
+      rank <- readRank <$> getItem (show level) storage
       pure $ LevelGames level rank $ createTrainingGames rank size
 
-  readLevel :: Maybe String -> Int
-  readLevel = case _ of
+  readList :: Level -> String -> Storage -> Effect (List String)
+  readList level sep storage =
+    strip
+      <<< fromFoldable
+      <<< split (Pattern sep)
+      <<< fromMaybe ""
+      <$> getItem (show level) storage
+
+  strip = case _ of
+    ("" : Nil) -> Nil
+    xs -> xs
+
+  readRank :: Maybe String -> Int
+  readRank = case _ of
     Nothing -> baseRank
     Just s -> fromMaybe baseRank $ fromString s
 
@@ -148,6 +180,7 @@ resetLevels = do
 baseRank :: Int
 baseRank = 30
 
+-- | Add a new completed intro game name to existing list
 updateIntroList :: String -> List LevelGames -> String
 updateIntroList name = joinWith "," <<< toUnfoldable <<< go <<< intro
   where
@@ -166,6 +199,7 @@ updateIntroList name = joinWith "," <<< toUnfoldable <<< go <<< intro
       else
         go xs
 
+-- | Mark a new completed intro game to be completed
 updateIntroGames :: String -> List LevelGames -> List LevelGames
 updateIntroGames name = case _ of
   Nil -> Nil
@@ -177,12 +211,14 @@ updateIntroGames name = case _ of
     Nil -> Nil
     (g : gs) -> (g { completed = name == g.game.name || g.completed }) : newGames gs
 
+-- | Update the list of LevelGames when an intro game is completed
 completeIntro :: String -> List LevelGames -> Effect (List LevelGames)
 completeIntro name levels = do
   s <- localStorage =<< window
   setItem (show Intro) (updateIntroList name levels) s
   pure (updateIntroGames name levels)
 
+-- | Increase the rank when a game is completed
 updateSizeRank :: Size -> List LevelGames -> Int
 updateSizeRank size = case _ of
   Nil -> baseRank
@@ -191,6 +227,7 @@ updateSizeRank size = case _ of
     false -> updateSizeRank size xs
   x : xs -> updateSizeRank size xs
 
+-- | Replace completed game by a new one
 updateSizeGames :: Size -> Int -> List LevelGames -> List LevelGames
 updateSizeGames size rank = case _ of
   Nil -> Nil
@@ -199,6 +236,7 @@ updateSizeGames size rank = case _ of
     false -> updateSizeGames size rank xs
   x : xs -> x : updateSizeGames size rank xs
 
+-- | Update the list of LevelGames when a non intro game is completed
 completeSize :: Size -> List LevelGames -> Effect (List LevelGames)
 completeSize size levels = do
   s <- localStorage =<< window
@@ -207,7 +245,68 @@ completeSize size levels = do
   where
   newRank = (updateSizeRank size levels)
 
+-- | Update the list of LevelGames when a game is completed
 completeLevel :: Level -> Game -> List LevelGames -> Effect (List LevelGames)
 completeLevel level game levels = case level of
+  -- Completed intro games are recorded by adding the game name to a list
   Intro -> completeIntro game.name levels
+  -- Custom game completion are not recorded
+  Custom -> pure levels
+  -- Other game completion are recorded by increasing the rank
   Size sz -> completeSize sz levels
+
+-- | Update the list of LevelGames when a new custom game is created or updated
+addCustomLevel :: Game -> List LevelGames -> Effect (List LevelGames)
+addCustomLevel game levels = do
+  s <- localStorage =<< window
+  setItem (show Custom) (joinWith "##" $ toUnfoldable $ map (\tg -> save tg.game) $ newCustom levels) s
+  pure (newLevels levels)
+  where
+  newCustom :: List LevelGames -> List TrainingGame
+  newCustom = case _ of
+    Nil -> Nil
+    (LevelGames Custom _ gs) : _ -> updateGame gs
+    x : xs -> newCustom xs
+
+  updateGame :: List TrainingGame -> List TrainingGame
+  updateGame = case _ of
+    Nil -> { completed: false, game } : Nil
+    g : gs ->
+      if g.game.name == game.name then
+        { completed: false, game } : gs
+      else
+        g : updateGame gs
+
+  newLevels :: List LevelGames -> List LevelGames
+  newLevels = case _ of
+    Nil -> Nil
+    (LevelGames Custom rank gs) : xs -> (LevelGames Custom rank (updateGame gs)) : newLevels xs
+    (x : xs) -> x : newLevels xs
+
+-- | Update the list of LevelGames when a new custom game is completed
+removeCustomLevel :: Game -> List LevelGames -> Effect (List LevelGames)
+removeCustomLevel game levels = do
+  s <- localStorage =<< window
+  setItem (show Custom) (joinWith "##" $ toUnfoldable $ map (\tg -> save tg.game) $ newCustom levels) s
+  pure (newLevels levels)
+  where
+  newCustom :: List LevelGames -> List TrainingGame
+  newCustom = case _ of
+    Nil -> Nil
+    (LevelGames Custom _ gs) : _ -> updateGame gs
+    x : xs -> newCustom xs
+
+  updateGame :: List TrainingGame -> List TrainingGame
+  updateGame = case _ of
+    Nil -> Nil
+    g : gs ->
+      if g.game.name == game.name then
+        gs
+      else
+        g : updateGame gs
+
+  newLevels :: List LevelGames -> List LevelGames
+  newLevels = case _ of
+    Nil -> Nil
+    (LevelGames Custom rank gs) : xs -> (LevelGames Custom rank (updateGame gs)) : newLevels xs
+    (x : xs) -> x : newLevels xs

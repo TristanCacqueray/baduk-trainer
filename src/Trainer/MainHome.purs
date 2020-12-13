@@ -1,11 +1,11 @@
 module Trainer.MainHome (component) where
 
 import Prelude
-import Trainer.Level
-import Baduk (Game, Result(..), loadBaduk)
+import Baduk (Game, Result(..), initGame, loadBaduk)
 import Bootstrap as Bootstrap
 import Data.Array (concat, fromFoldable, mapWithIndex)
 import Data.Either (Either(..))
+import Data.Foldable (traverse_)
 import Data.List (List(..), concatMap, length, range, zipWith)
 import Data.Maybe (Maybe(..))
 import Data.Symbol (SProxy(..))
@@ -25,9 +25,9 @@ import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Trainer.Board (boardSize, renderMiniBoard)
 import Trainer.Editor as Editor
+import Trainer.Level (Level(..), LevelGames(..), Size(..), TrainingGame, addCustomLevel, completeLevel, isNew, loadLevels, removeCustomLevel, resetLevels)
 import Trainer.Player as Player
 
--- import Trainer.Level (Save, getSave, initSave, storeSave)
 type Slots
   = ( editor :: Editor.Slot Unit
     , player :: Player.Slot Unit
@@ -47,6 +47,8 @@ data Action
   = SwitchMode Mode
   | Edited Level String (Maybe String)
   | Played Level Game (Maybe Result)
+  | AddNewGame
+  | RemoveGame Game
   | ResetSave
   | Initialize
 
@@ -86,26 +88,25 @@ component =
     , eval: H.mkEval $ H.defaultEval { handleAction = handleAction, initialize = Just Initialize }
     }
 
-mkTrainingGames :: forall id. Show id => Boolean -> id -> String -> Maybe TrainingGame
-mkTrainingGames completed idx sgf = case loadBaduk sgf of
-  Just game -> Just { game, completed }
-  _ -> Nothing
-
---   games = catMaybes (mapWithIndex (mkTrainingGames false) defaultGames)
 initialState :: forall input. input -> State
 initialState = const { levels: Nil, gnugo: Nothing, mode: ShowGames }
 
--- setCompleted :: List TrainingGame -> Int -> List TrainingGame
--- setCompleted xs idx = case index xs idx of
---   Just tg -> replaceGame idx (tg { completed = true }) xs
---   Nothing -> xs
 handleAction :: forall output m. MonadAff m => MonadEffect m => Action -> H.HalogenM State Action Slots output m Unit
 handleAction = case _ of
   SwitchMode mode -> (H.modify \s -> s { mode = mode }) >>= redraw
+  AddNewGame -> do
+    -- state <- H.get
+    H.modify_ \s -> s { mode = EditGame Custom (initGame { size = 9 }) }
+  RemoveGame game -> do
+    state <- H.get
+    levels <- H.liftEffect $ removeCustomLevel game state.levels
+    (H.modify \s -> s { levels = levels, mode = ShowGames }) >>= redraw
   Edited level id maybeGame -> case maybeGame of
     Just gameSgf -> case loadBaduk gameSgf of
-      Just game -> showGames
-      -- ( H.modify \state -> --     state --       { levels = replaceGame level id { completed: false, game } state.levels, mode = ShowGames } -- ) --   >>= redraw
+      Just game -> do
+        state <- H.get
+        levels <- H.liftEffect $ addCustomLevel game state.levels
+        (H.modify \s -> s { levels = levels, mode = ShowGames }) >>= redraw
       Nothing -> showGames
     Nothing -> showGames
   Played level game maybeResult -> case maybeResult of
@@ -113,7 +114,6 @@ handleAction = case _ of
       state <- H.get
       levels <- H.liftEffect $ completeLevel level game state.levels
       (H.modify \s -> s { levels = levels, mode = ShowGames }) >>= redraw
-      pure unit
     _ -> showGames
   Initialize -> do
     gnugo <- H.liftAff $ GnuGO.get gnuGoURL
@@ -123,18 +123,21 @@ handleAction = case _ of
     levels <- H.liftEffect $ resetLevels
     H.modify_ \s -> s { levels = levels }
   where
-  showGames = H.modify_ \s -> s { mode = ShowGames }
+  showGames = (H.modify \s -> s { mode = ShowGames }) >>= redraw
 
   redraw state =
     H.liftEffect do
+      -- Get all the board canvases using their id (level "-" index)
       canvases' <- getCanvases state
-      log (show $ concatMap getGameId state.levels)
       case canvases' of
         Just canvases -> do
-          c <- traverse Canvas.getContext2D canvases
-          _ <- traverse (uncurry renderMiniBoard) (zipWith (\ctx tg -> Tuple ctx tg.game) c (concatMap getGames state.levels))
-          pure unit
-        Nothing -> log "Where are the games canvases?!"
+          -- Get all the canvas contexts
+          ctxs <- traverse Canvas.getContext2D canvases
+          traverse_
+            (uncurry renderMiniBoard)
+            -- Combine canvas contexts and board game, assuming the order is identical
+            (zipWith (\ctx tg -> Tuple ctx tg.game) ctxs (concatMap getGames state.levels))
+        Nothing -> log "Where are the canvases?!"
 
   getCanvases :: State -> Effect (Maybe (List CanvasElement))
   getCanvases state =
@@ -149,12 +152,8 @@ handleAction = case _ of
   getGames :: LevelGames -> List TrainingGame
   getGames (LevelGames _ _ games) = games
 
--- Render
 render :: forall m. MonadAff m => MonadEffect m => State -> H.ComponentHTML Action Slots m
-render state =
-  HH.div
-    [ HP.class_ (ClassName "container") ]
-    (nav <> body)
+render state = HH.div [ HP.class_ (ClassName "container") ] (nav <> body)
   where
   nav =
     [ HH.nav
@@ -168,6 +167,12 @@ render state =
                 , HP.href "#"
                 ]
                 [ HH.text "Home" ]
+            , HH.a
+                [ HP.class_ (ClassName "nav-link")
+                , HE.onClick $ \e -> Just AddNewGame
+                , HP.href "#"
+                ]
+                [ HH.text "Create" ]
             , HH.a
                 [ HP.class_ (ClassName ("nav-link" <> aboutNavClass state.mode))
                 , HE.onClick $ clk ShowAbout
@@ -189,11 +194,9 @@ render state =
 
   newPlayer = isNew state.levels
 
-  mainInfo =
-    if newPlayer then
-      [ info [] ]
-    else
-      []
+  mainInfo = case newPlayer of
+    true -> [ info [] ]
+    false -> []
 
   aboutInfo =
     info
@@ -212,7 +215,9 @@ render state =
       )
 
   body = case state.gnugo of
+    -- Loading
     Nothing -> [ Bootstrap.center [ Bootstrap.spinner ] ]
+    -- Failed to load
     Just (Left error) ->
       [ Bootstrap.alertDanger
           [ HH.h4
@@ -223,6 +228,7 @@ render state =
           , HH.text "Try to refresh or use another browser."
           ]
       ]
+    -- WASM loaded, display body
     Just (Right gnugo) -> case state.mode of
       ShowAbout -> [ aboutInfo ]
       ShowGames ->
@@ -237,16 +243,17 @@ render state =
 
   clk mode = \e -> Just (SwitchMode mode)
 
-  showLevel rank = case _ of
+  showLevel = case _ of
+    Custom -> "My"
     Intro -> "Introduction"
-    (Size Short) -> "Short (" <> show rank <> ")"
-    (Size Medium) -> "Medium (" <> show rank <> ")"
-    (Size Long) -> "Long (" <> show rank <> ")"
+    (Size Short) -> "Short"
+    (Size Medium) -> "Medium"
+    (Size Long) -> "Long"
 
   renderGamesPicker = case _ of
-    LevelGames _ _ Nil -> []
+    LevelGames level _ Nil -> []
     LevelGames level rank games ->
-      [ HH.h4_ [ HH.text (showLevel rank level) ]
+      [ HH.h4_ [ HH.text (showLevel level <> " games") ]
       , Bootstrap.row $ mapWithIndex (renderGamePicker level) (fromFoldable games)
       , HH.hr_
       ]
@@ -255,10 +262,14 @@ render state =
     Bootstrap.card tg.game.name
       [ Bootstrap.row [ Bootstrap.canvas (show level <> "-" <> show idx) $ boardSize tg.game.size `div` 2 ]
       , Bootstrap.row
-          [ Bootstrap.button
-              (if tg.completed then "success" else "primary")
-              (if tg.completed then "replay" else "play")
-              $ clk (PlayGame level tg.game)
-          , Bootstrap.button "secondary" "edit" $ clk (EditGame level tg.game)
-          ]
+          ( [ Bootstrap.button
+                (if tg.completed then "success" else "primary")
+                (if tg.completed then "replay" else "play")
+                $ clk (PlayGame level tg.game)
+            , Bootstrap.button "secondary" "edit" $ clk (EditGame level tg.game)
+            ]
+              <> case level of
+                  Custom -> [ Bootstrap.button "danger" "X" $ \e -> Just $ RemoveGame tg.game ]
+                  _ -> []
+          )
       ]
