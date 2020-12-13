@@ -1,7 +1,8 @@
 module Trainer.Board (boardSize, renderMiniBoard, renderBoard, mouseCoord) where
 
 import Prelude
-import Baduk.Types (Coord(..), Game, Stone(..))
+import Baduk (Move(..), getLastMove)
+import Baduk.Types (Coord(..), Game, PlayerMove(..), Stone(..))
 import Data.Int (round, toNumber)
 import Data.List (List(..), range)
 import Data.Maybe (Maybe(..))
@@ -13,7 +14,7 @@ import Graphics.Canvas as Canvas
 import Halogen (liftEffect)
 import Math (abs)
 import Math as Math
-import SGF (Color(..), showHexColor)
+import SGF (Color(..), inverseColor, showHexColor)
 import Web.Event.Event as WE
 import Web.HTML.HTMLElement as HTMLElement
 import Web.UIEvent.MouseEvent (MouseEvent, clientX, clientY, toEvent)
@@ -127,6 +128,10 @@ renderBoard ctx selection game =
       xs -> for_ xs (\(Stone color coord) -> renderStone color coord)
     -- Removal
     for_ selection renderClear
+    -- Last move
+    case getLastMove game of
+      Just (Move color (PlaceStone coord)) -> renderLastMove (inverseColor color) coord
+      _ -> pure unit
   where
   boardSize' = toNumber $ boardSize game.size
 
@@ -152,6 +157,14 @@ renderBoard ctx selection game =
             Canvas.moveTo ctx (xPos - l) (yPos + l)
             Canvas.lineTo ctx (xPos + l) (yPos - l)
             Canvas.closePath ctx
+
+  renderLastMove :: Color -> Coord -> Effect Unit
+  renderLastMove color (Coord x y) = do
+    Canvas.strokePath ctx
+      $ do
+          Canvas.setStrokeStyle ctx (showHexColor color)
+          Canvas.setLineWidth ctx 3.0
+          Canvas.arc ctx { x: (coordPos x), y: (coordPos y), radius: 25.0 * 0.4, start: 0.0, end: Math.pi * 2.0 }
 
   renderStone :: Color -> Coord -> Effect Unit
   renderStone color (Coord x y) = do
