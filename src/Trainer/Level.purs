@@ -113,6 +113,7 @@ defaultIntroGames =
     : "(;GN[Ko]SZ[5]KM[2]PL[B];AB[bc][ac][cb][dc][ec][bb][db];AW[cc][bd][ad][dd][ed][ce];)"
     : "(;GN[Intro]SZ[6]PL[B];AB[bb][db][bd][cc];AW[bc][ee];)"
     : "(;GN[Territory]SZ[5]KM[6.5]PL[B];)"
+    : "(;GN[Atari]SZ[7]KM[6.5]PL[B];AB[dd][be][cf][df][ef][fe][bd][fd];AW[cd][de][ed];)"
     : "(;GN[Handicap2]SZ[7]KM[6.5]PL[B];AB[ce][ec];)"
     : "(;GN[Handicap1]SZ[7]KM[6.5]PL[B];AB[dd];)"
     : "(;GN[Seven]SZ[7]KM[6.5]PL[B];)"
