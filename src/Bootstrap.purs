@@ -40,13 +40,13 @@ alertDanger = alert "danger"
 row :: forall w i. Array (HTML w i) -> HTML w i
 row = div "row"
 
-button :: forall w i. String -> String -> (MouseEvent -> Maybe i) -> HTML w i
+button :: forall w i. String -> String -> (MouseEvent -> i) -> HTML w i
 button level body cb = HH.a [ HP.class_ (ClassName $ "btn btn-" <> level), HE.onClick cb ] [ HH.text body ]
 
 canvas :: forall w i. String -> Int -> HTML w i
 canvas id size =
   HH.canvas
-    [ HP.id_ id
+    [ HP.id id
     , HP.width size
     , HP.height size
     , HP.prop (PropName "style") "border: 1px solid black"

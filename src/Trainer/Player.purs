@@ -32,7 +32,7 @@ type Output
 type Slot id
   = forall query. H.Slot query Output id
 
-component :: forall query m. MonadAff m => MonadEffect m => H.Component HH.HTML query Input Output m
+-- component :: forall query m. MonadAff m => MonadEffect m => H.Component HH.HTML query Input Output m
 component =
   H.mkComponent
     { initialState
@@ -99,13 +99,13 @@ render state =
 
     board =
       HH.canvas
-        [ HP.id_ "trainer-board"
+        [ HP.id "trainer-board"
         , HP.width boardSize'
         , HP.height boardSize'
         , HP.prop (PropName "style") "border: 1px solid black"
-        , HE.onClick \e -> Just $ AddStone e
-        , HE.onMouseMove \e -> Just $ MouseMove e
-        , HE.onMouseLeave \e -> Just MouseLeave
+        , HE.onClick \e -> AddStone e
+        , HE.onMouseMove \e -> MouseMove e
+        , HE.onMouseLeave \e -> MouseLeave
         ]
 
     item :: forall v. Show v => String -> v -> _
@@ -135,13 +135,13 @@ render state =
       GameOver (Score color _) -> case color == state.game.startingPlayer of
         true ->
           [ HH.a
-              [ HP.class_ (ClassName "btn btn-success"), HE.onClick \s -> Just $ Completed Win ]
+              [ HP.class_ (ClassName "btn btn-success"), HE.onClick \s -> Completed Win ]
               [ HH.text "Complete" ]
           ]
         false -> []
       _ ->
         [ HH.a
-            [ HP.class_ (ClassName "btn btn-primary"), HE.onClick \s -> Just $ DoPass ]
+            [ HP.class_ (ClassName "btn btn-primary"), HE.onClick \s -> DoPass ]
             [ HH.text "Pass" ]
         ]
   in
@@ -158,10 +158,10 @@ render state =
           , HH.div_
               ( mainButton
                   <> [ HH.a
-                        [ HP.class_ (ClassName "btn btn-secondary"), HE.onClick \s -> Just $ Restart ]
+                        [ HP.class_ (ClassName "btn btn-secondary"), HE.onClick \s -> Restart ]
                         [ HH.text "Restart" ]
                     , HH.a
-                        [ HP.class_ (ClassName "btn btn-danger"), HE.onClick \s -> Just $ Completed Loss ]
+                        [ HP.class_ (ClassName "btn btn-danger"), HE.onClick \s -> Completed Loss ]
                         [ HH.text "Resign" ]
                     ]
               )

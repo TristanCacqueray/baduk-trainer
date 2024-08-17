@@ -1,22 +1,23 @@
 module Trainer.Board (boardSize, renderMiniBoard, renderBoard, mouseCoord) where
 
-import Prelude
 import Baduk (Move(..), getLastMove)
 import Baduk.Types (Coord(..), Game, PlayerMove(..), Stone(..))
 import Data.Int (round, toNumber)
 import Data.List (List(..), range)
 import Data.Maybe (Maybe(..))
+import Data.Number (pi)
+import Data.Ord (abs)
 import Data.Traversable (for_)
 import Data.Tuple (Tuple(..))
 import Effect (Effect)
 import Graphics.Canvas (arc, fillPath, rect, setFillStyle, withContext)
 import Graphics.Canvas as Canvas
 import Halogen (liftEffect)
-import Math (abs)
-import Math as Math
+import Prelude
 import SGF (Color(..), inverseColor, showHexColor)
 import Web.Event.Event as WE
 import Web.HTML.HTMLElement as HTMLElement
+import Web.DOM.Element as DomElement
 import Web.UIEvent.MouseEvent (MouseEvent, clientX, clientY, toEvent)
 
 boardPadding :: Number
@@ -48,7 +49,7 @@ relativePosition :: MouseEvent -> Effect (Maybe { x :: Int, y :: Int })
 relativePosition ev = case WE.target (toEvent ev) >>= HTMLElement.fromEventTarget of
   Just elem ->
     liftEffect do
-      boundingRect <- HTMLElement.getBoundingClientRect elem
+      boundingRect <- DomElement.getBoundingClientRect (HTMLElement.toElement elem)
       pure
         $ Just
             { x: clientX ev - round boundingRect.left
@@ -96,7 +97,7 @@ renderMiniBoard ctx game =
   renderStone :: Color -> Coord -> Effect Unit
   renderStone color (Coord x y) = do
     setFillStyle ctx (showHexColor color)
-    fillPath ctx $ arc ctx { x: (coordPos x), y: (coordPos y), radius: 12.5 * 0.8, start: 0.0, end: Math.pi * 2.0 }
+    fillPath ctx $ arc ctx { x: (coordPos x), y: (coordPos y), radius: 12.5 * 0.8, start: 0.0, end: pi * 2.0, useCounterClockwise: false }
 
 renderBoard :: Canvas.Context2D -> Maybe (Tuple Coord (Maybe Color)) -> Game -> Effect Unit
 renderBoard ctx selection game =
@@ -164,9 +165,9 @@ renderBoard ctx selection game =
       $ do
           Canvas.setStrokeStyle ctx (showHexColor color)
           Canvas.setLineWidth ctx 3.0
-          Canvas.arc ctx { x: (coordPos x), y: (coordPos y), radius: 25.0 * 0.4, start: 0.0, end: Math.pi * 2.0 }
+          Canvas.arc ctx { x: (coordPos x), y: (coordPos y), radius: 25.0 * 0.4, start: 0.0, end: pi * 2.0, useCounterClockwise: false }
 
   renderStone :: Color -> Coord -> Effect Unit
   renderStone color (Coord x y) = do
     setFillStyle ctx (showHexColor color)
-    fillPath ctx $ arc ctx { x: (coordPos x), y: (coordPos y), radius: 25.0 * 0.8, start: 0.0, end: Math.pi * 2.0 }
+    fillPath ctx $ arc ctx { x: (coordPos x), y: (coordPos y), radius: 25.0 * 0.8, start: 0.0, end: pi * 2.0, useCounterClockwise: false }

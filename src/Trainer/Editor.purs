@@ -7,13 +7,13 @@ module Trainer.Editor
   , renderMignature
   ) where
 
-import Prelude
 import Baduk (Coord, Game, Result, initGame, loadBaduk)
 import Baduk as Baduk
 import Data.Int (round)
 import Data.Maybe (Maybe(..))
 import Data.Number (fromString)
-import Data.Symbol (SProxy(..))
+import Data.Number (pi)
+-- import Data.Symbol (SProxy(..))
 import Data.Traversable (sequence, traverse)
 import Data.Tuple (Tuple(..))
 import Effect (Effect)
@@ -23,12 +23,13 @@ import Effect.Console (logShow)
 import GnuGO as GnuGO
 import Graphics.Canvas (CanvasElement, arc, fillPath, getCanvasElementById, rect, setFillStyle, translate, withContext)
 import Graphics.Canvas as Canvas
+import Type.Proxy (Proxy(..))
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Core (PropName(..), ClassName(..))
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
-import Math as Math
+import Prelude
 import SGF (Color(..), showHexColor)
 import Trainer.Board (boardSize, renderBoard, mouseCoord)
 import Trainer.Player as Player
@@ -48,9 +49,9 @@ type Slot id
 type Slots
   = ( testPlayer :: Player.Slot Unit )
 
-player = SProxy :: SProxy "testPlayer"
+player = Proxy :: Proxy "testPlayer"
 
-component :: forall query m. MonadAff m => MonadEffect m => H.Component HH.HTML query Input Output m
+-- component :: forall query m. MonadAff m => MonadEffect m => H.Component HH.HTML query Input Output m
 component =
   H.mkComponent
     { initialState: initialSGFEditorState
@@ -76,10 +77,10 @@ renderStoneSelection color (Selected selected) canvas = do
     -- Selection
     when selected do
       setFillStyle ctx "blue"
-      fillPath ctx $ arc ctx { x: 0.0, y: 0.0, radius: r * 0.9, start: 0.0, end: Math.pi * 2.0 }
+      fillPath ctx $ arc ctx { x: 0.0, y: 0.0, radius: r * 0.9, start: 0.0, end: pi * 2.0, useCounterClockwise: false }
     -- Stone
     setFillStyle ctx (showHexColor color)
-    fillPath ctx $ arc ctx { x: 0.0, y: 0.0, radius: r * 0.8, start: 0.0, end: Math.pi * 2.0 }
+    fillPath ctx $ arc ctx { x: 0.0, y: 0.0, radius: r * 0.8, start: 0.0, end: pi * 2.0, useCounterClockwise: false }
   where
   moveToCenter ctx = translate ctx { translateX: r, translateY: r }
 
@@ -138,11 +139,11 @@ renderSGFEditor state = do
       HH.div
         [ HP.class_ (ClassName "row") ]
         [ HH.canvas
-            [ HP.id_ $ name <> "Picker"
+            [ HP.id $ name <> "Picker"
             , HP.width 50
             , HP.height 50
             , HP.prop (PropName "style") "border: 1px solid black"
-            , HE.onClick \_ -> Just action
+            , HE.onClick \_ -> action
             ]
         ]
 
@@ -150,13 +151,13 @@ renderSGFEditor state = do
 
     mkBoard =
       HH.canvas
-        [ HP.id_ "board"
+        [ HP.id "board"
         , HP.width boardSize'
         , HP.height boardSize'
         , HP.prop (PropName "style") "border: 1px solid black"
-        , HE.onClick \_ -> Just AddStone
-        , HE.onMouseMove \e -> Just $ MouseMove e
-        , HE.onMouseLeave \e -> Just ClearSelection
+        , HE.onClick \_ ->  AddStone
+        , HE.onMouseMove \e -> MouseMove e
+        , HE.onMouseLeave \e -> ClearSelection
         ]
 
     editor =
@@ -181,21 +182,21 @@ renderSGFEditor state = do
                   [ HH.text "Name: "
                   , HH.input
                       [ HP.value state.game.name
-                      , HE.onValueInput (Just <<< ChangeName)
+                      , HE.onValueInput ChangeName
                       ]
                   ]
               , HH.div_
                   [ HH.text "Size: "
                   , HH.input
                       [ HP.value (show state.game.size)
-                      , HE.onValueInput (Just <<< ChangeSize)
+                      , HE.onValueInput (ChangeSize)
                       ]
                   ]
               , HH.div_
                   [ HH.text "Komi: "
                   , HH.input
                       [ HP.value (show state.game.komi)
-                      , HE.onValueInput (Just <<< ChangeKomi)
+                      , HE.onValueInput (ChangeKomi)
                       ]
                   ]
               , HH.div_
@@ -204,13 +205,13 @@ renderSGFEditor state = do
                   ]
               , HH.div_
                   [ HH.a
-                      [ HP.class_ (ClassName "btn btn-primary"), HE.onClick \s -> Just $ Save ]
+                      [ HP.class_ (ClassName "btn btn-primary"), HE.onClick \s -> Save ]
                       [ HH.text "Save" ]
                   , HH.a
-                      [ HP.class_ (ClassName "btn btn-secondary"), HE.onClick \s -> Just $ Cancel ]
+                      [ HP.class_ (ClassName "btn btn-secondary"), HE.onClick \s -> Cancel ]
                       [ HH.text "Cancel" ]
                   , HH.a
-                      [ HP.class_ (ClassName "btn btn-info"), HE.onClick \s -> Just $ TestGame ]
+                      [ HP.class_ (ClassName "btn btn-info"), HE.onClick \s -> TestGame ]
                       [ HH.text "Test" ]
                   ]
               ]
@@ -219,7 +220,7 @@ renderSGFEditor state = do
 
     body = case state.mode of
       Edit -> editor
-      Test -> [ HH.slot player unit Player.component { game: state.game, gnugo: state.gnugo } (Just <<< Resume) ]
+      Test -> [ HH.slot player unit Player.component { game: state.game, gnugo: state.gnugo } (Resume) ]
   HH.div
     [ HP.class_ (ClassName "container") ]
     ( [ HH.h1_

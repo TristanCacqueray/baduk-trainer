@@ -9,12 +9,12 @@ import Data.List (many, some)
 import Data.Maybe (Maybe(..), optional)
 import Data.Number (fromString)
 import Data.String.CodeUnits (fromCharArray)
+import Parsing (ParseError, Parser, runParser, fail)
+import Parsing.Combinators (between, try)
+import Parsing.String (char, string, satisfy)
+import Parsing.Token (digit, letter)
 import Prelude (bind, pure, ($), (&&), (-), (/=), (<=), (<>), (>=), (>>=))
 import SGF.Types (Color(..), GameTree(..), Node, Property(..), SGF, Sequence, Value(..))
-import Text.Parsing.Parser (ParseError, Parser, runParser, fail)
-import Text.Parsing.Parser.Combinators (between, try)
-import Text.Parsing.Parser.String (char, string, satisfy)
-import Text.Parsing.Parser.Token (digit, letter)
 
 type P a
   = Parser String a

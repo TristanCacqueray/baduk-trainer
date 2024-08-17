@@ -1,6 +1,5 @@
 module Trainer.MainHome (component) where
 
-import Prelude
 import Baduk (Game, Result(..), initGame, loadBaduk)
 import Bootstrap as Bootstrap
 import Data.Array (concat, fromFoldable, mapWithIndex)
@@ -8,7 +7,6 @@ import Data.Either (Either(..))
 import Data.Foldable (traverse_)
 import Data.List (List(..), concatMap, length, range, zipWith)
 import Data.Maybe (Maybe(..))
-import Data.Symbol (SProxy(..))
 import Data.Traversable (sequence, traverse)
 import Data.Tuple (Tuple(..), uncurry)
 import Effect (Effect)
@@ -23,19 +21,21 @@ import Halogen.HTML as HH
 import Halogen.HTML.Core (ClassName(..))
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
+import Prelude
 import Trainer.Board (boardSize, renderMiniBoard)
 import Trainer.Editor as Editor
 import Trainer.Level (Level(..), LevelGames(..), Size(..), TrainingGame, addCustomLevel, completeLevel, isNew, loadLevels, removeCustomLevel, resetLevels)
 import Trainer.Player as Player
+import Type.Proxy (Proxy(..))
 
 type Slots
   = ( editor :: Editor.Slot Unit
     , player :: Player.Slot Unit
     )
 
-editor = SProxy :: SProxy "editor"
+editor = Proxy :: Proxy "editor"
 
-player = SProxy :: SProxy "player"
+player = Proxy :: Proxy "player"
 
 data Mode
   = ShowGames
@@ -80,7 +80,7 @@ type State
     , mode :: Mode
     }
 
-component :: forall query input output m. MonadAff m => MonadEffect m => H.Component HH.HTML query input output m
+-- component :: forall query input output m. MonadAff m => MonadEffect m => H.Component HH.HTML query input output m
 component =
   H.mkComponent
     { initialState
@@ -169,7 +169,7 @@ render state = HH.div [ HP.class_ (ClassName "container") ] (nav <> body)
                 [ HH.text "Home" ]
             , HH.a
                 [ HP.class_ (ClassName "nav-link")
-                , HE.onClick $ \e -> Just AddNewGame
+                , HE.onClick $ \e -> AddNewGame
                 , HP.href "#"
                 ]
                 [ HH.text "Create" ]
@@ -210,7 +210,7 @@ render state = HH.div [ HP.class_ (ClassName "container") ] (nav <> body)
             ]
         , case newPlayer of
             true -> Bootstrap.button "primary" "Pick a game" $ clk ShowGames
-            false -> Bootstrap.button "warning" "Reset state" $ \e -> Just ResetSave
+            false -> Bootstrap.button "warning" "Reset state" $ \e -> ResetSave
         ]
       )
 
@@ -238,10 +238,10 @@ render state = HH.div [ HP.class_ (ClassName "container") ] (nav <> body)
               ]
                 <> (concat $ fromFoldable $ map renderGamesPicker state.levels)
             )
-      EditGame level game -> [ HH.slot editor unit Editor.component { game, gnugo } (Just <<< Edited level game.name) ]
-      PlayGame level game -> [ HH.slot player unit Player.component { game, gnugo } (Just <<< Played level game) ]
+      EditGame level game -> [ HH.slot editor unit Editor.component { game, gnugo } (Edited level game.name) ]
+      PlayGame level game -> [ HH.slot player unit Player.component { game, gnugo } (Played level game) ]
 
-  clk mode = \e -> Just (SwitchMode mode)
+  clk mode = \e -> SwitchMode mode
 
   showLevel = case _ of
     Custom -> "My"
@@ -269,7 +269,7 @@ render state = HH.div [ HP.class_ (ClassName "container") ] (nav <> body)
             , Bootstrap.button "secondary" "edit" $ clk (EditGame level tg.game)
             ]
               <> case level of
-                  Custom -> [ Bootstrap.button "danger" "X" $ \e -> Just $ RemoveGame tg.game ]
+                  Custom -> [ Bootstrap.button "danger" "X" $ \e -> RemoveGame tg.game ]
                   _ -> []
           )
       ]
